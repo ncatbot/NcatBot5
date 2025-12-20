@@ -1,0 +1,13 @@
+# 包含基本的项目文件
+include README.md
+include LICENSE.txt
+
+global-exclude __pycache__
+global-exclude *.pyc
+global-exclude *.log
+
+# 在src中包含包文件
+recursive-include src *.py
+recursive-include src *.yaml
+recursive-include src *.yml
+recursive-include src *.txt

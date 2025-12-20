@@ -1,0 +1,4 @@
+packaging>=21.3
+aiofiles>=23.1.0
+PyYAML>=6.0
+watchdog>=2.2.0

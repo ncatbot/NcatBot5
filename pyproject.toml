@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Fcatbot"
+# version is read dynamically from src/meta.py
+dynamic = ["version"]
+description = "一个基于通信协议的 Python Bot SDK"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+license = "MIT"
+# keywords = ["bot", "plugin", "protocol", "IM"]
+authors = [{ name = "Fish-LP", email = "Fish.zh@outlook.com" }]
+maintainers = [{ name = "Fish-LP", email = "Fish.zh@outlook.com" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [ # 运行时依赖
+    "packaging>=21.3",
+    "aiofiles>=23.1.0",
+    "PyYAML>=6.0",
+    "watchdog>=2.2.0",
+]
+
+[project.optional-dependencies] # 可选依赖
+wheel = ["build", "twine"]
+
+# [project.urls]
+# "Homepage" = "https://example.com/"   # replace with actual project URL
+# "Repository" = "https://example.com/" # replace with actual repo URL
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic.version]
+attr = "meta.__version__"
+
+# [project.scripts]
+# bot = "src.__main__:main"
+
+# Hatch build hooks
+[tool.hatch.build.targets.wheel.hooks]
+# runs before wheel build; points to a callable `cat.hatch_hooks:pre_build`
+pre-build = ["cat.hatch_hooks:pre_build"]
