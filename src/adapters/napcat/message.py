@@ -1,4 +1,5 @@
 from typing import Any, Union
+
 from .api_base import NCAPIBase
 
 
@@ -6,7 +7,7 @@ class NCAPIMessage(NCAPIBase):
     """napcatAPI消息类"""
 
     async def delete_msg(
-        self, 
+        self,
         message_id: Union[int, str],
     ) -> Any:
         """删除消息
@@ -16,14 +17,14 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "delete_msg", 
+            "delete_msg",
             {
                 "message_id": message_id,
             },
         )
-    
+
     async def get_msg(
-        self, 
+        self,
         message_id: Union[int, str],
     ) -> Any:
         """获取消息
@@ -33,14 +34,14 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "get_msg", 
+            "get_msg",
             {
                 "message_id": message_id,
             },
         )
-    
+
     async def get_image(
-        self, 
+        self,
         image_id: str,
     ) -> Any:
         """获取图片消息详情
@@ -50,15 +51,15 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "get_image", 
+            "get_image",
             {
                 "file_id": image_id,
             },
         )
 
     async def get_record(
-        self, 
-        record_id: str, 
+        self,
+        record_id: str,
         output_type: str = "mp3",
     ) -> Any:
         """获取语音消息详情
@@ -69,15 +70,15 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "get_record", 
+            "get_record",
             {
-                "file_id": record_id, 
+                "file_id": record_id,
                 "out_format": output_type,
             },
         )
 
     async def get_file(
-        self, 
+        self,
         file_id: str,
     ) -> Any:
         """获取文件消息详情
@@ -87,16 +88,16 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "get_file", 
+            "get_file",
             {
                 "file_id": file_id,
             },
         )
-    
+
     async def set_msg_emoji_like(
-        self, 
-        message_id: Union[int, str], 
-        emoji_id: str, 
+        self,
+        message_id: Union[int, str],
+        emoji_id: str,
         emoji_set: bool,
     ) -> Any:
         """设置消息表情点赞
@@ -110,12 +111,12 @@ class NCAPIMessage(NCAPIBase):
         return (
             "set_msg_emoji_like",
             {
-                "message_id": message_id, 
-                "emoji_id": emoji_id, 
+                "message_id": message_id,
+                "emoji_id": emoji_id,
                 "set": emoji_set,
             },
         )
-    
+
     async def fetch_emoji_like(
         self,
         message_id: Union[int, str],
@@ -148,12 +149,12 @@ class NCAPIMessage(NCAPIBase):
         if count:
             params["count"] = count
         return (
-            "fetch_emoji_like", 
+            "fetch_emoji_like",
             params,
         )
 
     async def get_forward_msg(
-        self, 
+        self,
         message_id: str,
     ) -> Any:
         """获取合并转发消息
@@ -163,15 +164,15 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "get_forward_msg", 
+            "get_forward_msg",
             {
                 "message_id": message_id,
             },
         )
 
     async def send_poke(
-        self, 
-        user_id: Union[int, str], 
+        self,
+        user_id: Union[int, str],
         group_id: Union[int, str] = None,
     ) -> Any:
         """发送戳一戳
@@ -185,13 +186,13 @@ class NCAPIMessage(NCAPIBase):
         if group_id:
             params["group_id"] = group_id
         return (
-            "send_poke", 
+            "send_poke",
             params,
         )
-    
+
     async def forward_friend_single_msg(
-        self, 
-        message_id: str, 
+        self,
+        message_id: str,
         user_id: Union[int, str],
     ) -> Any:
         """转发消息给好友
@@ -202,16 +203,16 @@ class NCAPIMessage(NCAPIBase):
             API响应数据
         """
         return (
-            "forward_friend_single_msg", 
+            "forward_friend_single_msg",
             {
-                "user_id": user_id, 
+                "user_id": user_id,
                 "message_id": message_id,
             },
         )
-    
+
     async def send_private_forward_msg(
-        self, 
-        user_id: Union[int, str], 
+        self,
+        user_id: Union[int, str],
         messages: dict,
     ) -> Any:
         """合并转发消息给好友
@@ -223,7 +224,7 @@ class NCAPIMessage(NCAPIBase):
         """
         if len(messages) == 0:
             return None
-        
+
         return (
             "send_private_forward_msg",
             {

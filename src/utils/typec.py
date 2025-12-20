@@ -1,19 +1,19 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, auto
-from typing import Any, Dict, Iterable, List, NewType, Optional
+from typing import Iterable, List, NewType, Optional
 
-from .io import Resource
 from .helper import MsgId as _MsgId
-
+from .io import Resource
 
 MsgId = _MsgId
-UserID = NewType('UserID', str)
-GroupID = NewType('GroupID', str)
+UserID = NewType("UserID", str)
+GroupID = NewType("GroupID", str)
 
 
 class MessageType(Enum):
     """消息类型枚举"""
+
     Text = auto()
     Image = auto()
     File = auto()
@@ -28,30 +28,34 @@ class MessageType(Enum):
 
 class MessageStatus(Enum):
     """消息状态枚举"""
-    Sending   = auto()
-    Sent      = auto()
+
+    Sending = auto()
+    Sent = auto()
     Delivered = auto()
-    Read      = auto()
-    Failed    = auto()
-    Recalled  = auto()
+    Read = auto()
+    Failed = auto()
+    Recalled = auto()
 
 
 class Sex(str, Enum):
     """性别枚举"""
-    Male   = "male"
+
+    Male = "male"
     Female = "female"
     Unknown = "unknown"
 
 
 class Role(str, Enum):
     """群角色枚举"""
-    Owner  = "owner"
-    Admin  = "admin"
+
+    Owner = "owner"
+    Admin = "admin"
     Member = "member"
-    None_  = "none"        # 避免与关键字冲突，加下划线
+    None_ = "none"  # 避免与关键字冲突，加下划线
 
 
 # ------------------- 参考 -------------------
+
 
 @dataclass(slots=True)
 class Sender:
@@ -64,7 +68,7 @@ class Sender:
 class Message:
     id: MsgId
     sender: Sender
-    content: Iterable   # 具体消息链
+    content: Iterable  # 具体消息链
     timestamp: datetime = field(default_factory=datetime.now(timezone.utc))
     text: str = ""
     group_id: Optional[GroupID] = None
@@ -89,7 +93,7 @@ class User:
 class Group:
     id: GroupID
     name: str
-    owner: User                    # 完整对象
+    owner: User  # 完整对象
     admins: List[User] = field(default_factory=list)
     avatar: Optional[Resource] = None
     members: int = 0

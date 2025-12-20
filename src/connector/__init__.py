@@ -1,19 +1,24 @@
-'''
+"""
 连接器，用于与服务提供者连接
-'''
+"""
 from abc import ABC, abstractmethod
-from typing import Any, NoReturn
-from .wsclient import SyncWebSocketClient, AsyncWebSocketClient, MessageType
 from logging import Logger, getLogger
+from typing import Any, NoReturn
+
+from .wsclient import AsyncWebSocketClient, MessageType
+
 
 class BaseWsClient(ABC):
-    def __init__(self, uri: str, headers: str = None, ssl: bool = False, logger: Logger = getLogger('WsClient')):
+    def __init__(
+        self,
+        uri: str,
+        headers: str = None,
+        ssl: bool = False,
+        logger: Logger = getLogger("WsClient"),
+    ):
         super().__init__()
         client = AsyncWebSocketClient(
-            uri=uri,
-            headers=headers,
-            verify_ssl=ssl,
-            logger=logger
+            uri=uri, headers=headers, verify_ssl=ssl, logger=logger
         )
         self.logger = logger
         self.client = client
@@ -42,10 +47,15 @@ class BaseWsClient(ABC):
                         self.logger.warning("未处理的消息类型: %s", unhandled)
         finally:
             await client.stop()
-    
+
     @abstractmethod
-    async def on_message(self, data: Any) -> Any: ...
+    async def on_message(self, data: Any) -> Any:
+        ...
+
     @abstractmethod
-    async def on_close(self, data: Any) -> Any: ...
+    async def on_close(self, data: Any) -> Any:
+        ...
+
     @abstractmethod
-    async def on_error(self, data: Any) -> Any: ...
+    async def on_error(self, data: Any) -> Any:
+        ...

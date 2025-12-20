@@ -40,7 +40,7 @@ import asyncio
 # 创建应用实例
 app = PluginApplication(
     plugin_dirs=["./plugins"],
-    config_dir="./config", 
+    config_dir="./config",
     data_dir="./data"
 )
 
@@ -60,15 +60,15 @@ from pack.plugins_system.core.plugins import Plugin
 
 class BasicPlugin(Plugin):
     """基础插件示例"""
-    
+
     name = "basic_plugin"
     version = "1.0.0"
     authors = ["开发者"]
-    
+
     async def on_load(self):
         self.logger.info("插件已加载")
         self.register_handler("test.message", self.handle_message)
-    
+
     async def handle_message(self, event):
         return {"response": "消息已处理", "data": event.data}
 ```
@@ -85,22 +85,22 @@ import redis.asyncio as redis
 
 class CustomEventBus(EventBus):
     """完全自定义的事件总线实现"""
-    
+
     def __init__(self, redis_url: str, max_queue_size: int = 1000):
         self.redis = redis.from_url(redis_url)
         self.max_queue_size = max_queue_size
         self._handlers = {}
-    
+
     def register_handler(self, event, handler, plugin_name=None):
         # 自定义注册逻辑
         handler_id = str(uuid.uuid4())
         self._handlers[handler_id] = {
             'event': event,
-            'handler': handler, 
+            'handler': handler,
             'plugin': plugin_name
         }
         return handler_id
-    
+
     async def publish(self, event: str, data: Any = None, **kwargs):
         # 自定义发布逻辑
         message = {
@@ -109,7 +109,7 @@ class CustomEventBus(EventBus):
             'timestamp': time.time()
         }
         await self.redis.publish('plugin_events', json.dumps(message))
-    
+
     # 实现其他抽象方法...
 ```
 
@@ -120,27 +120,27 @@ from pack.plugins_system.abc.plugins import PluginManager
 
 class CustomPluginManager(PluginManager):
     """自定义插件管理器"""
-    
+
     def __init__(self, plugin_dirs, config_dir, data_dir, event_bus):
         self.plugin_dirs = plugin_dirs
         self.config_dir = config_dir
         self.data_dir = data_dir
         self.event_bus = event_bus
-        
+
         # 自定义初始化逻辑
         self._plugins = {}
         self._dependency_graph = {}
-    
+
     async def load_plugins(self):
         # 自定义加载逻辑
         plugins = await self._discover_plugins()
         sorted_plugins = self._resolve_dependencies(plugins)
-        
+
         for plugin in sorted_plugins:
             await self._load_single_plugin(plugin)
-        
+
         return list(self._plugins.values())
-    
+
     # 实现其他抽象方法...
 ```
 
@@ -156,7 +156,7 @@ NAMESPACE = uuid.UUID('12345678-1234-5678-1234-567812345678')
 # 插件状态
 class PluginState:
     LOADED = "loaded"
-    RUNNING = "running" 
+    RUNNING = "running"
     STOPPED = "stopped"
     FAILED = "failed"
     UNLOADED = "unloaded"
@@ -188,11 +188,11 @@ class AdvancedPlugin(Plugin):
         # 使用系统常量
         if self.protocol_version != PROTOCOL_VERSION:
             raise ValueError("协议版本不兼容")
-        
+
         # 使用特性开关
         if FeatureFlags.DEBUG_MODE:
             self.logger.debug("调试模式已启用")
-        
+
         # 发布系统事件
         self.publish_event(SystemEvents.PLUGIN_LOADED, self.meta)
 ```
@@ -208,28 +208,28 @@ from pack.plugins_system.core.mixin import PluginMixin
 
 class DatabaseMixin(PluginMixin):
     """数据库混入类"""
-    
+
     async def on_mixin_load(self):
         self.db_connection = await self._create_connection()
         self.logger.info("数据库连接已建立")
-    
+
     async def on_mixin_unload(self):
         if hasattr(self, 'db_connection'):
             await self.db_connection.close()
             self.logger.info("数据库连接已关闭")
-    
+
     async def execute_query(self, query, params=None):
         return await self.db_connection.execute(query, params)
 
 class CacheMixin(PluginMixin):
     """缓存混入类"""
-    
+
     async def on_mixin_load(self):
         self.cache_client = await self._setup_cache()
-    
+
     async def get_cached(self, key):
         return await self.cache_client.get(key)
-    
+
     async def set_cached(self, key, value, ttl=3600):
         await self.cache_client.set(key, value, ex=ttl)
 ```
@@ -239,34 +239,34 @@ class CacheMixin(PluginMixin):
 ```python
 class UserServicePlugin(Plugin, DatabaseMixin, CacheMixin):
     """使用多个混入类的插件"""
-    
+
     name = "user_service"
     version = "2.0.0"
-    
+
     async def on_load(self):
         # 混入类的on_mixin_load会自动调用
         await super().on_load()
-        
+
         # 直接使用混入类提供的方法
         self.register_handler("user.get", self.get_user)
-    
+
     async def get_user(self, event):
         user_id = event.data['user_id']
-        
+
         # 先尝试从缓存获取
         cached_user = await self.get_cached(f"user:{user_id}")
         if cached_user:
             return cached_user
-        
+
         # 缓存未命中，查询数据库
         user = await self.execute_query(
-            "SELECT * FROM users WHERE id = ?", 
+            "SELECT * FROM users WHERE id = ?",
             (user_id,)
         )
-        
+
         # 写入缓存
         await self.set_cached(f"user:{user_id}", user)
-        
+
         return user
 ```
 
@@ -284,7 +284,7 @@ LOG_FILE_PATH=./logs
 LOG_FILE_NAME=app_%Y%m%d.log
 BACKUP_COUNT=7
 
-# 插件系统配置  
+# 插件系统配置
 PLUGIN_SYSTEM_DEBUG=false
 EVENT_BUS_MAX_WORKERS=10
 LOG_REDIRECT_RULES='{"database": "db.log", "api": "api.log"}'
@@ -320,11 +320,11 @@ class ConfigurablePlugin(Plugin):
         # 访问配置
         db_config = self.config.get('database', {})
         api_config = self.config.get('api', {})
-        
+
         # 使用配置值
         self.db_host = db_config.get('host', 'localhost')
         self.api_timeout = api_config.get('timeout', 30)
-        
+
         # 特性开关
         if self.config.get('features', {}).get('enable_caching', False):
             self.setup_caching()
@@ -341,10 +341,10 @@ class EventDrivenPlugin(Plugin):
     async def on_load(self):
         # 精确字符串匹配
         self.register_handler("user.created", self.handle_user_created)
-        
+
         # 正则表达式匹配
         self.register_handler("re:order\..*", self.handle_order_events)
-        
+
         # 批量注册
         event_handlers = {
             "payment.completed": self.handle_payment,
@@ -352,21 +352,21 @@ class EventDrivenPlugin(Plugin):
             "notification.sent": self.handle_notification
         }
         self.register_handlers(event_handlers)
-    
+
     async def handle_user_created(self, event):
         user_data = event.data
-        
+
         # 发布后续事件
         self.publish_event("user.welcome_email", {
             "email": user_data['email'],
             "username": user_data['username']
         })
-        
+
         self.publish_event("user.analytics", {
             "user_id": user_data['id'],
             "signup_source": user_data.get('source', 'direct')
         })
-    
+
     async def send_notification(self, user_id, message):
         # 请求-响应模式
         results = await self.request_event(
@@ -395,16 +395,16 @@ class SafePathPlugin(Plugin):
     async def on_load(self):
         # 不推荐：会改变整个进程的工作目录
         # os.chdir(self.data_dir)
-        
+
         # 推荐：使用绝对路径
         config_path = self.data_dir / "config.json"
         await self.load_config(config_path)
-        
+
         # 或者使用上下文管理器（如果启用）
         # async with self.working_directory():
         #     # 在此块内工作目录已切换
         #     await self.process_files()
-    
+
     async def load_config(self, config_path):
         # 使用绝对路径，不依赖当前工作目录
         if config_path.exists():
@@ -420,23 +420,23 @@ class ResourceAwarePlugin(Plugin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._resources = []
-    
+
     async def on_load(self):
         try:
             # 初始化资源
             self._resources.append(await self.create_database_pool())
             self._resources.append(await self.create_http_client())
             self._resources.append(await self.create_cache_client())
-            
+
             self.logger.info("所有资源已初始化")
         except Exception as e:
             await self._cleanup_resources()
             raise
-    
+
     async def on_unload(self):
         await self._cleanup_resources()
         self.logger.info("所有资源已清理")
-    
+
     async def _cleanup_resources(self):
         for resource in self._resources:
             try:

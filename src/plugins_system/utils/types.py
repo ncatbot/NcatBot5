@@ -4,7 +4,8 @@
 包含插件系统中使用的所有类型别名和新型类型定义
 """
 
-from typing import TYPE_CHECKING ,TypeAlias, Union, Callable, Awaitable, Any
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, TypeAlias, Union
+
 if TYPE_CHECKING:
     from ..core.events import Event
 

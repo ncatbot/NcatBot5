@@ -22,11 +22,11 @@
 #             debug: bool=False,
 #             protocol: str = 'napcat'
 #             ):
-        
+
 #         if protocol not in ApiBase._registry:
 #             raise ValueError(f"未知通信协议: {protocol}")
 #         self._api = ApiBase._registry[protocol]
-        
+
 #         self.plugin_manage=DefaultPluginManager(
 #             plugin_dirs=DefaultSetting.plugin_dirs,
 #             config_base_dir=DefaultSetting.config_dir,
@@ -34,14 +34,14 @@
 #             dev_mode=debug or DefaultSetting.debug
 #         )
 #         self.plugins: List[Plugin] = []
-        
+
 #         super().__init__(
 #             uri=uri,
 #             headers=f"Authorization: Bearer {token}" if token else None,
 #             ssl=ssl,
 #             logger=logger
 #         )
-        
+
 #         self._debug = debug
 
 #     async def on_close(self, data):
@@ -60,10 +60,10 @@
 
 #     async def load_plugins(self):
 #         self.plugins = await self.plugin_manage.load_plugins()
-    
+
 #     async def link_ws_server(self):
 #         await self.run()
-    
+
 #     async def run(self):
 #         await self.link_ws_server()
 #         await self.load_plugins()

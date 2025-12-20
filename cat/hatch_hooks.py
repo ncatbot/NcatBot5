@@ -14,7 +14,6 @@ import logging
 import os
 import re
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -42,7 +41,11 @@ def _read_meta_version_and_copyright() -> tuple[str, Optional[str]]:
 
 def _get_latest_git_tag() -> Optional[str]:
     try:
-        out = subprocess.check_output(["git", "describe", "--tags", "--abbrev=0"], cwd=ROOT, stderr=subprocess.STDOUT)
+        out = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=ROOT,
+            stderr=subprocess.STDOUT,
+        )
         tag = out.decode().strip()
         if tag.startswith("v"):
             tag = tag[1:]
@@ -52,12 +55,20 @@ def _get_latest_git_tag() -> Optional[str]:
         return None
 
 
-def _update_license_year() -> bool:
+def _update_license_year(dry_run: bool | None = None) -> bool:
+    """更新 `License.txt` 的年份。
+
+    参数 dry_run 用于覆盖模块级 DRY_RUN（当为 None 时使用 DRY_RUN）。
+    """
+    if dry_run is None:
+        dry_run = DRY_RUN
+
     if not LICENSE.exists():
         LOG.warning("未找到 %s，跳过 License 年份更新", LICENSE)
         return False
 
     txt = LICENSE.read_text(encoding="utf-8")
+
     # 替换类似版权行中的结束年份，例如 (c) 2020 或 2019-2024
     def repl(m: re.Match) -> str:
         prefix = m.group(1)
@@ -69,33 +80,47 @@ def _update_license_year() -> bool:
             new = f"{prefix}{YEAR}"
         return new
 
-    new_txt, n = re.subn(r"(Copyright(?:\s*\(c\))?\s+)(\d{4})(?:-(\d{4}))?", repl, txt, flags=re.I)
+    new_txt, n = re.subn(
+        r"(Copyright(?:\s*\(c\))?\s+)(\d{4})(?:-(\d{4}))?", repl, txt, flags=re.I
+    )
     if n:
         LOG.info("更新 %s (%d 次替换)", LICENSE, n)
-        if not DRY_RUN:
+        if not dry_run:
             LICENSE.write_text(new_txt, encoding="utf-8")
         return True
     LOG.debug("在 %s 中未找到版权模式，跳过", LICENSE)
     return False
 
 
-def _update_meta_copy_and_version_check() -> bool:
+def _update_meta_copy_and_version_check(dry_run: bool | None = None) -> bool:
+    """更新 `src/meta.py` 的版权信息并检查版本（不会自动修改版本）。
+
+    参数 dry_run 用于覆盖模块级 DRY_RUN（当为 None 时使用 DRY_RUN）。
+    如果发现版本与最新 tag 相同，会抛出 SystemExit(2)。
+    """
+    if dry_run is None:
+        dry_run = DRY_RUN
+
     text = META.read_text(encoding="utf-8")
     version, copyright_text = _read_meta_version_and_copyright()
 
     changed = False
 
-    # 更新 __copyright__ 行为当前年份
+    # 更新 __copyright__ 为当前年份
     def _replace_copyright(m: re.Match) -> str:
         prefix = m.group(1)
         author = m.group(4) if m.group(4) else ""
         return f"{prefix}{YEAR} {author}".strip()
 
-    new_text, n = re.subn(r"(__copyright__\s*=\s*['\"]Copyright\s*\(c\)\s*)(\d{4})(?:-(\d{4}))?(\s*.*?['\"])", lambda m: m.group(1) + str(YEAR) + m.group(4), text)
+    new_text, n = re.subn(
+        r"(__copyright__\s*=\s*['\"]Copyright\s*\(c\)\s*)(\d{4})(?:-(\d{4}))?(\s*.*?['\"])",
+        lambda m: m.group(1) + str(YEAR) + m.group(4),
+        text,
+    )
     if n:
         LOG.info("已更新 %s 中的 __copyright__", META)
         changed = True
-        if not DRY_RUN:
+        if not dry_run:
             META.write_text(new_text, encoding="utf-8")
             text = new_text
 
@@ -103,7 +128,9 @@ def _update_meta_copy_and_version_check() -> bool:
     latest_tag = _get_latest_git_tag()
     if latest_tag:
         if version == latest_tag:
-            LOG.error("%s 中的版本 (%s) 与最新 git tag (%s) 相同：请先更新版本号", META, version, latest_tag)
+            LOG.error(
+                "%s 中的版本 (%s) 与最新 git tag (%s) 相同：请先更新版本号", META, version, latest_tag
+            )
             raise SystemExit(2)
         else:
             LOG.info("版本检查通过：meta %s, 最新 tag %s", version, latest_tag)

@@ -40,11 +40,25 @@ def main() -> int:
         print("测试未通过，终止 CI", file=sys.stderr)
         return rv
 
-    # 2) 运行 pre-build 钩子（以 dry-run 模式）
-    try:
-        # 确保干运行，不会修改仓库
-        import os
+    # 2) 尝试运行 pre-commit（CI 上对所有文件运行自动修复），但避免在 pre-commit 本身的执行环境中重复调用
+    #    当 PRE_COMMIT=1（pre-commit hook 的运行环境）或 FCAT_SKIP_PRECOMMIT=1 时跳过
+    if (
+        os.environ.get("PRE_COMMIT") == "1"
+        or os.environ.get("FCAT_SKIP_PRECOMMIT") == "1"
+    ):
+        print("跳过 pre-commit 调用（在 pre-commit 环境或被显式禁用）")
+    else:
+        try:
+            rv = subprocess.call(["pre-commit", "run", "--all-files"])
+            if rv != 0:
+                print("pre-commit 修复/检查未全部通过，请查看输出", file=sys.stderr)
+                return rv
+        except FileNotFoundError:
+            print("pre-commit 未安装，请在 CI 中安装 pre-commit。", file=sys.stderr)
+            return 3
 
+    # 3) 运行构建前检查（dry-run）以确保一致性
+    try:
         os.environ.setdefault("HC_DRY_RUN", "1")
         hatch_hooks.pre_build()
     except SystemExit as e:

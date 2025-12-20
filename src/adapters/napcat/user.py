@@ -1,4 +1,5 @@
 from typing import Any, List, Union
+
 from .message import NCAPIMessage
 
 
@@ -6,10 +7,10 @@ class NCAPIUser(NCAPIMessage):
     """napcatAPI用户类"""
 
     async def send_private_msg(
-            self, 
-            user_id: Union[str, int], 
-            message: List[dict],
-            ) -> Any:
+        self,
+        user_id: Union[str, int],
+        message: List[dict],
+    ) -> Any:
         """发送私聊消息(顶级接口，应当继续使用消息段封装)
         Args:
             user_id: 目标用户ID
@@ -18,17 +19,17 @@ class NCAPIUser(NCAPIMessage):
             API响应数据
         """
         return (
-            "send_private_msg", 
+            "send_private_msg",
             {
-                "user_id":user_id, 
-                "message":message,
+                "user_id": user_id,
+                "message": message,
             },
         )
-    
+
     async def set_qq_profile(
-        self, 
-        nickname: str, 
-        personal_note: str, 
+        self,
+        nickname: str,
+        personal_note: str,
         sex: str,
     ) -> Any:
         """设置账号信息
@@ -49,8 +50,8 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def get_user_card(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         phone_number: str,
     ) -> Any:
         """获取用户名片
@@ -69,8 +70,8 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def get_group_card(
-        self, 
-        group_id: str, 
+        self,
+        group_id: str,
         phone_number: str,
     ) -> Any:
         """获取群名片
@@ -89,7 +90,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def get_share_group_card(
-        self, 
+        self,
         group_id: str,
     ) -> Any:
         """获取群共享名片
@@ -106,7 +107,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def set_online_status(
-        self, 
+        self,
         status: str,
     ) -> Any:
         """设置在线状态
@@ -135,7 +136,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def set_qq_avatar(
-        self, 
+        self,
         avatar: str,
     ) -> Any:
         """设置头像
@@ -152,8 +153,8 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def send_like(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         times: int,
     ) -> Any:
         """发送赞
@@ -172,8 +173,8 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def create_collection(
-        self, 
-        rawdata: str, 
+        self,
+        rawdata: str,
         brief: str,
     ) -> Any:
         """创建收藏
@@ -192,9 +193,9 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def set_friend_add_request(
-        self, 
-        flag: str, 
-        approve: bool, 
+        self,
+        flag: str,
+        approve: bool,
         remark: str,
     ) -> Any:
         """设置好友请求
@@ -215,7 +216,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def set_self_long_nick(
-        self, 
+        self,
         longnick: str,
     ) -> Any:
         """设置个性签名
@@ -232,7 +233,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def get_stranger_info(
-        self, 
+        self,
         user_id: Union[int, str],
     ) -> Any:
         """获取限生人信息
@@ -249,7 +250,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def get_friend_list(
-        self, 
+        self,
         cache: bool = False,
     ) -> Any:
         """获取好友列表
@@ -278,7 +279,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def fetch_custom_face(
-        self, 
+        self,
         count: int,
     ) -> Any:
         """获取收藏表情
@@ -295,9 +296,9 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def upload_private_file(
-        self, 
-        user_id: Union[int, str], 
-        file: str, 
+        self,
+        user_id: Union[int, str],
+        file: str,
         name: str,
     ) -> Any:
         """上传私聊文件
@@ -344,7 +345,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def nc_get_user_status(
-        self, 
+        self,
         user_id: Union[int, str],
     ) -> Any:
         """获取用户状态
@@ -361,7 +362,7 @@ class NCAPIUser(NCAPIMessage):
         )
 
     async def get_mini_app_ark(
-        self, 
+        self,
         app_json: dict,
     ) -> Any:
         """获取小程序卡片
@@ -374,9 +375,9 @@ class NCAPIUser(NCAPIMessage):
             "get_mini_app_ark",
             app_json,
         )
-    
+
     async def mark_private_msg_as_read(
-        self, 
+        self,
         user_id: Union[int, str],
     ) -> Any:
         """设置私聊已读
@@ -386,12 +387,12 @@ class NCAPIUser(NCAPIMessage):
             API响应数据
         """
         return (
-            "mark_private_msg_as_read", 
+            "mark_private_msg_as_read",
             {
                 "user_id": user_id,
             },
         )
-    
+
     async def get_friend_msg_history(
         self,
         user_id: Union[int, str],
@@ -417,7 +418,7 @@ class NCAPIUser(NCAPIMessage):
                 "reverseOrder": reverse_order,
             },
         )
-    
+
     async def set_friend_remark(
         self,
         user_id: Union[int, str],

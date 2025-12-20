@@ -1,15 +1,16 @@
+import datetime as dt
 from dataclasses import dataclass
 from typing import Optional
-from ..utils.typec import UserID, MsgId
-import datetime as dt
+
+from ..utils.typec import MsgId, UserID
 
 
 # ========== 消息节点系统 ==========
 class MessageNode:
     """消息节点父类"""
-    def __str__(self) -> str:
-        return ''
 
+    def __str__(self) -> str:
+        return ""
 
 
 @dataclass

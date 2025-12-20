@@ -1,19 +1,20 @@
-from typing import Any, Union, List, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
+
 from .api_base import NCAPIBase
 
 
 class NCAPISystem(NCAPIBase):
-    '''系统接口'''
-    
+    """系统接口"""
+
     def get_client_key(
-            self,
-            ) -> Any:
+        self,
+    ) -> Any:
         """获取 client_key
         Returns:
             API响应数据
         """
         return (
-            "get_clientkey", 
+            "get_clientkey",
             {},
         )
 
@@ -25,12 +26,12 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_robot_uin_range", 
+            "get_robot_uin_range",
             {},
         )
 
     async def ocr_image(
-        self, 
+        self,
         image: str,
     ) -> Any:
         """OCR 图片识别
@@ -40,14 +41,14 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "ocr_image", 
+            "ocr_image",
             {
                 "image": image,
             },
         )
 
     async def ocr_image_new(
-        self, 
+        self,
         image: str,
     ) -> Any:
         """OCR 图片识别(新版)
@@ -57,14 +58,14 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            ".ocr_image", 
+            ".ocr_image",
             {
                 "image": image,
             },
         )
 
     async def translate_en2zh(
-        self, 
+        self,
         words: List[str],
     ) -> Any:
         """英文翻译为中文
@@ -74,7 +75,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "translate_en2zh", 
+            "translate_en2zh",
             {
                 "words": words,
             },
@@ -88,13 +89,13 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_login_info", 
+            "get_login_info",
             {},
         )
 
     async def set_input_status(
-        self, 
-        event_type: int, 
+        self,
+        event_type: int,
         user_id: Union[int, str],
     ) -> Any:
         """设置输入状态
@@ -105,9 +106,9 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "set_input_status", 
+            "set_input_status",
             {
-                "eventType": event_type, 
+                "eventType": event_type,
                 "user_id": user_id,
             },
         )
@@ -143,12 +144,12 @@ class NCAPISystem(NCAPIBase):
             if name:
                 params["name"] = name
         return (
-            "download_file", 
+            "download_file",
             params,
         )
 
     async def get_cookies(
-        self, 
+        self,
         domain: str,
     ) -> Any:
         """获取 cookies
@@ -158,15 +159,15 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_cookies", 
+            "get_cookies",
             {
                 "domain": domain,
             },
         )
 
     async def handle_quick_operation(
-        self, 
-        context: Dict, 
+        self,
+        context: Dict,
         operation: Dict,
     ) -> Any:
         """对事件执行快速操作
@@ -177,9 +178,9 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            ".handle_quick_operation", 
+            ".handle_quick_operation",
             {
-                "context": context, 
+                "context": context,
                 "operation": operation,
             },
         )
@@ -192,12 +193,12 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_csrf_token", 
+            "get_csrf_token",
             {},
         )
 
     async def get_credentials(
-        self, 
+        self,
         domain: str,
     ) -> Any:
         """获取 QQ 相关接口凭证
@@ -207,14 +208,14 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_credentials", 
+            "get_credentials",
             {
                 "domain": domain,
             },
         )
 
     async def get_model_show(
-        self, 
+        self,
         model: str,
     ) -> Any:
         """获取模型显示
@@ -224,7 +225,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "_get_model_show", 
+            "_get_model_show",
             {
                 "model": model,
             },
@@ -238,7 +239,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "can_send_image", 
+            "can_send_image",
             {},
         )
 
@@ -250,7 +251,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "nc_get_packet_status", 
+            "nc_get_packet_status",
             {},
         )
 
@@ -262,7 +263,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "can_send_record", 
+            "can_send_record",
             {},
         )
 
@@ -274,7 +275,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_status", 
+            "get_status",
             {},
         )
 
@@ -286,7 +287,7 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "nc_get_rkey", 
+            "nc_get_rkey",
             {},
         )
 
@@ -298,10 +299,10 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "get_version_info", 
+            "get_version_info",
             {},
         )
-    
+
     async def mark_all_as_read(
         self,
     ) -> Any:
@@ -310,29 +311,26 @@ class NCAPISystem(NCAPIBase):
             API响应数据
         """
         return (
-            "_mark_all_as_read", 
+            "_mark_all_as_read",
             {},
         )
-    
+
     async def get_recent_contact(
-        self, 
+        self,
         count: int,
     ) -> Any:
         """最近消息列表
-        
+
         获取的最新消息是每个会话最新的消息
-        
+
         Args:
             count: 会话数量
         Returns:
             API响应数据
         """
         return (
-            "get_recent_contact", 
+            "get_recent_contact",
             {
                 "count": count,
             },
         )
-
-
-

@@ -1,13 +1,11 @@
-from ..plugins_system import Plugin, PluginContext
-from ..plugins_system.core.plugins import PluginState
+from ..plugins_system import Plugin
 from .client import IMClient
 
 
 class PluginBase(Plugin):
-    
-    def __init__(self, context, config, debug = False):
+    def __init__(self, context, config, debug=False):
         super().__init__(context, config, debug)
-    
+
     @property
     def client(self) -> IMClient:
         if isinstance(self._client, IMClient):

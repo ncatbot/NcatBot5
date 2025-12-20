@@ -1,11 +1,10 @@
 import abc
-import logging
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, NewType, Optional, Tuple, Union
 
 # ------------------- 抽象层 -------------------
-ListenerId = NewType('ListenerId', str)
+ListenerId = NewType("ListenerId", str)
+
 
 class MessageType(Enum):
     Text = "text"
@@ -16,6 +15,7 @@ class MessageType(Enum):
     Error = "error"
     NONE = "none"
 
+
 class WebSocketState(Enum):
     Disconnected = "disconnected"
     Connecting = "connecting"
@@ -24,17 +24,22 @@ class WebSocketState(Enum):
     Closing = "closing"
     Closed = "closed"
 
+
 class WebSocketError(Exception):
     pass
+
 
 class ConnectionError(WebSocketError):
     pass
 
+
 class ListenerEvictedError(WebSocketError):
     pass
 
+
 class ListenerClosedError(WebSocketError):
     pass
+
 
 class ABCWebSocketClient(abc.ABC):
     """WebSocket 客户端抽象，任何实现都必须满足这些接口。"""
@@ -66,9 +71,7 @@ class ABCWebSocketClient(abc.ABC):
 
     @abc.abstractmethod
     async def get_message(
-        self,
-        listener_id: ListenerId,
-        timeout: Optional[float] = None
+        self, listener_id: ListenerId, timeout: Optional[float] = None
     ) -> Tuple[Any, MessageType]:
         """从指定监听器阻塞读取一条消息。"""
         raise NotImplementedError

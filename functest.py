@@ -1,11 +1,13 @@
-import json
 import inspect
+import json
 from functools import wraps
+
 
 def extract_google_style_doc(func):
     """
     装饰器，用于提取函数的谷歌风格注释信息
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -20,7 +22,7 @@ def extract_google_style_doc(func):
     parameters = signature.parameters
 
     # 解析文档字符串
-    doc_lines = doc.split('\n')
+    doc_lines = doc.split("\n")
     doc_info = {
         "name": func.__name__,
         "args": [],
@@ -28,7 +30,7 @@ def extract_google_style_doc(func):
         "params": {},
         "returns": "",
         "raises": {},
-        "annotations": {}
+        "annotations": {},
     }
 
     # 提取函数描述
@@ -83,25 +85,26 @@ def extract_google_style_doc(func):
 
     return wrapper
 
+
 # 示例使用
 @extract_google_style_doc
 def re(self, path: str) -> str:
-    '''
+    """
     解析正则表达式
-    
+
     Args:
         path: 正则表达式
-        
+
     Returns:
         解析结果
-        
+
     Raises:
         ValueError: 路径无效
-        
-    '''
+
+    """
     pass
+
+
 # {'name': 're', 'args': ['path'], 'doc': '解析正则表达式', 'params': {'path': '正则表达式'}, 'returns': '解析结果', 'raises': {'ValueError': '路径无效'}, 'annotations': {'path': "<class 'str'>"}}
 # 测试提取结果
 print(json.dumps(re.doc_info, indent=4, ensure_ascii=False))
-
-

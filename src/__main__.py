@@ -1,15 +1,13 @@
 import asyncio
 import logging
-import signal
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Optional, Self
 
-from .plugins_system import PluginApplication, EventBus, Event
-from .core.client import IMClient
 from .abc.protocol_abc import ProtocolABC
 from .connector import AsyncWebSocketClient
-from .utils.constants import ProtocolName, DefaultSetting
-from .utils.logger import Color
+from .core.client import IMClient
+from .plugins_system import Event, EventBus, PluginApplication
+from .utils.constants import DefaultSetting, ProtocolName
 
 if TYPE_CHECKING:
     pass
@@ -41,31 +39,33 @@ class Bot:
         url: str,
         token: Optional[str] = None,
         plugin_dir: Optional[Path | str] = None,
-        protocol: ProtocolName = 'napcat',
-        config_dir: Path | str = 'config',
-        data_dir: Path | str = 'data',
+        protocol: ProtocolName = "napcat",
+        config_dir: Path | str = "config",
+        data_dir: Path | str = "data",
     ):
         # 插件系统
         plugin_dirs = list(DefaultSetting.sys_plugins)
-        if plugin_dir:  plugin_dirs.append(plugin_dir)
-        
+        if plugin_dir:
+            plugin_dirs.append(plugin_dir)
+
         self.plugin_sys = PluginApplication(
             plugin_dirs=plugin_dirs,
             config_dir=config_dir,
             data_dir=data_dir,
             dev_mode=DefaultSetting.debug,  # TODO 热重载
-            event_bus=DefaultSetting.event_bus
+            event_bus=DefaultSetting.event_bus,
         )
         self.event_bus: EventBus = self.plugin_sys.event_bus
 
         # 协议层
         from .abc.protocol_abc import ProtocolMeta
+
         protocol_class = ProtocolMeta.get_protocol(protocol)
         self._protocol: ProtocolABC = protocol_class()
 
         # 停止信号
         self._stop_event = asyncio.Event()
-        
+
         self.token = token
         self.url = url
 
@@ -77,10 +77,12 @@ class Bot:
     # ---------- 同步入口 ----------
     def run(self) -> None:
         """阻塞式启动，直到 Bot 退出"""
+
         async def _():
             await self.run_async()
             while not Bot.running:
                 await asyncio.sleep(0.1)
+
         try:
             asyncio.run(_())
         except KeyboardInterrupt:
@@ -106,19 +108,20 @@ class Bot:
 
         try:
             # 握手 / 登录
-            self.ws: AsyncWebSocketClient = await self.protocol.login(self.url ,self.token)
+            self.ws: AsyncWebSocketClient = await self.protocol.login(
+                self.url, self.token
+            )
             log.info("Bot登录成功")
-            
+
             # 监听器
             self.listener = await self.ws.create_listener()
-            
+
             # 实例化 IMClient
             self._im_client = IMClient(self.protocol)
-            
+
             # 启动插件
             await self.plugin_sys.start()
             log.info("插件系统启动完成")
-
 
             log.info("IMClient 启动完成，Bot 开始工作 ...")
 
@@ -136,12 +139,11 @@ class Bot:
 
     # ---------- 内部运行 ----------
     async def _cat(self) -> None:
-        
         ws = self.ws
         protocol = self.protocol
         event_bus = self.event_bus
         listener_id = self.listener
-        
+
         # print(1)
         raw = await ws.get_message(listener_id)
         print(raw)
@@ -162,7 +164,7 @@ class Bot:
                 self._safe_coro("plugin_sys.stop", self.plugin_sys.stop())
             )
         )
-        
+
         # 通知协议层注销
         # if hasattr(self, "_protocol"):
         #     tasks.append(
@@ -191,11 +193,9 @@ class Bot:
             await coro
         except Exception as exc:
             log.error(f"清理阶段 {name} 异常: {exc}", exc_info=True)
-    
-    
+
     async def __aenter__(self) -> Self:
         return await self.run_async()
-    
+
     async def __aexit__(self, exc_type, exc, tb):
         await self.stop()
-        

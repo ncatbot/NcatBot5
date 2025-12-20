@@ -16,7 +16,7 @@ def test_requirements_sync_with_pyproject():
     if start != -1:
         start = data.find("[", start)
         end = data.find("]", start)
-        deps_block = data[start+1:end]
+        deps_block = data[start + 1 : end]
 
     py_deps = []
     for item in deps_block.splitlines():

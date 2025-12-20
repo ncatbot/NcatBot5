@@ -1,9 +1,9 @@
-from .user import NCAPIUser
-from .group import NCAPIGroup
-from .api_base import NCAPIBase
-from .system import NCAPISystem
-from .message import NCAPIMessage
 from ...connector import AsyncWebSocketClient
+from .api_base import NCAPIBase
+from .group import NCAPIGroup
+from .message import NCAPIMessage
+from .system import NCAPISystem
+from .user import NCAPIUser
 
 
 class NCAPI(NCAPIBase):
@@ -16,7 +16,7 @@ class NCAPI(NCAPIBase):
         self.group = NCAPIGroup()
         self.system = NCAPISystem()
         self.message = NCAPIMessage()
-    
+
     def set_client(self, client: AsyncWebSocketClient):
         """设置 WebSocket 客户端并共享给所有子 API"""
         self.client = client

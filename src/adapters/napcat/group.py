@@ -1,4 +1,5 @@
 from typing import Any, List, Union
+
 from .message import NCAPIMessage
 
 
@@ -6,10 +7,10 @@ class NCAPIGroup(NCAPIMessage):
     """napcatAPI群组类"""
 
     async def send_group_message(
-            self, 
-            group_id: Union[str, int], 
-            message: List[dict],
-            ) -> Any:
+        self,
+        group_id: Union[str, int],
+        message: List[dict],
+    ) -> Any:
         """发送群组消息(顶级接口，应当继续使用消息段封装)
         Args:
             group_id: 群号
@@ -18,30 +19,29 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "send_group_msg", 
+            "send_group_msg",
             {
-                "group_id":group_id, 
-                "message":message,
+                "group_id": group_id,
+                "message": message,
             },
         )
-    
+
     async def get_group_list(
-            self,
-            ) -> Any:
+        self,
+    ) -> Any:
         """获取群组列表
         Returns:
             API响应数据
         """
         return (
-            "get_group_list", 
+            "get_group_list",
             {},
         )
 
-
     async def get_group_info(
-            self, 
-            group_id: int,
-            ) -> Any:
+        self,
+        group_id: int,
+    ) -> Any:
         """获取群组信息
         Args:
             group_id: 群号
@@ -49,12 +49,12 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_info", 
+            "get_group_info",
             {
                 "group_id": group_id,
             },
         )
-    
+
     async def set_group_kick(
         self,
         group_id: Union[int, str],
@@ -79,9 +79,9 @@ class NCAPIGroup(NCAPIMessage):
         )
 
     async def set_group_ban(
-        self, 
-        group_id: Union[int, str], 
-        user_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
+        user_id: Union[int, str],
         duration: int,
     ) -> Any:
         """群组禁言
@@ -95,14 +95,14 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "set_group_ban",
             {
-                "group_id": group_id, 
-                "user_id": user_id, 
+                "group_id": group_id,
+                "user_id": user_id,
                 "duration": duration,
             },
         )
 
     async def get_group_system_msg(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群系统消息
@@ -112,14 +112,14 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_system_msg", 
+            "get_group_system_msg",
             {
                 "group_id": group_id,
             },
         )
 
     async def get_essence_msg_list(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取精华消息列表
@@ -129,15 +129,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_essence_msg_list", 
+            "get_essence_msg_list",
             {
                 "group_id": group_id,
             },
         )
 
     async def set_group_whole_ban(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         enable: bool,
     ) -> Any:
         """群组全员禁言
@@ -148,16 +148,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_group_whole_ban", 
+            "set_group_whole_ban",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "enable": enable,
             },
         )
 
     async def set_group_portrait(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         file: str,
     ) -> Any:
         """设置群头像
@@ -168,17 +168,17 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_group_portrait", 
+            "set_group_portrait",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "file": file,
             },
         )
 
     async def set_group_admin(
-        self, 
-        group_id: Union[int, str], 
-        user_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
+        user_id: Union[int, str],
         enable: bool,
     ) -> Any:
         """设置群管理员
@@ -192,14 +192,14 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "set_group_admin",
             {
-                "group_id": group_id, 
-                "user_id": user_id, 
+                "group_id": group_id,
+                "user_id": user_id,
                 "enable": enable,
             },
         )
 
     async def set_essence_msg(
-        self, 
+        self,
         message_id: Union[int, str],
     ) -> Any:
         """设置精华消息
@@ -209,16 +209,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_essence_msg", 
+            "set_essence_msg",
             {
                 "message_id": message_id,
             },
         )
 
     async def set_group_card(
-        self, 
-        group_id: Union[int, str], 
-        user_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
+        user_id: Union[int, str],
         card: str,
     ) -> Any:
         """设置群名片
@@ -230,16 +230,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_group_card", 
+            "set_group_card",
             {
-                "group_id": group_id, 
-                "user_id": user_id, 
+                "group_id": group_id,
+                "user_id": user_id,
                 "card": card,
             },
         )
 
     async def delete_essence_msg(
-        self, 
+        self,
         message_id: Union[int, str],
     ) -> Any:
         """删除精华消息
@@ -249,15 +249,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "delete_essence_msg", 
+            "delete_essence_msg",
             {
                 "message_id": message_id,
             },
         )
 
     async def set_group_name(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         group_name: str,
     ) -> Any:
         """设置群名
@@ -268,15 +268,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_group_name", 
+            "set_group_name",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "group_name": group_name,
             },
         )
 
     async def set_group_leave(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """退出群组
@@ -286,16 +286,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_group_leave", 
+            "set_group_leave",
             {
                 "group_id": group_id,
             },
         )
 
     async def send_group_notice(
-        self, 
-        group_id: Union[int, str], 
-        content: str, 
+        self,
+        group_id: Union[int, str],
+        content: str,
         image: str = "",
     ) -> Any:
         """发送群公告
@@ -310,22 +310,22 @@ class NCAPIGroup(NCAPIMessage):
             return (
                 "_send_group_notice",
                 {
-                    "group_id": group_id, 
-                    "content": content, 
+                    "group_id": group_id,
+                    "content": content,
                     "image": image,
                 },
             )
         else:
             return (
-                "_send_group_notice", 
+                "_send_group_notice",
                 {
-                    "group_id": group_id, 
+                    "group_id": group_id,
                     "content": content,
                 },
             )
 
     async def get_group_notice(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群公告
@@ -335,16 +335,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "_get_group_notice", 
+            "_get_group_notice",
             {
                 "group_id": group_id,
             },
         )
 
     async def set_group_special_title(
-        self, 
-        group_id: Union[int, str], 
-        user_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
+        user_id: Union[int, str],
         special_title: str,
     ) -> Any:
         """设置群头衔
@@ -358,17 +358,17 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "set_group_special_title",
             {
-                "group_id": group_id, 
-                "user_id": user_id, 
+                "group_id": group_id,
+                "user_id": user_id,
                 "special_title": special_title,
             },
         )
 
     async def upload_group_file(
-        self, 
-        group_id: Union[int, str], 
-        file: str, 
-        name: str, 
+        self,
+        group_id: Union[int, str],
+        file: str,
+        name: str,
         folder_id: str,
     ) -> Any:
         """上传群文件
@@ -383,17 +383,17 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "upload_group_file",
             {
-                "group_id": group_id, 
-                "file": file, 
-                "name": name, 
+                "group_id": group_id,
+                "file": file,
+                "name": name,
                 "folder_id": folder_id,
             },
         )
 
     async def set_group_add_request(
-        self, 
-        flag: str, 
-        approve: bool, 
+        self,
+        flag: str,
+        approve: bool,
         reason: str = "",
     ) -> Any:
         """处理加群请求
@@ -406,9 +406,9 @@ class NCAPIGroup(NCAPIMessage):
         """
         if approve:
             return (
-                "set_group_add_request", 
+                "set_group_add_request",
                 {
-                    "flag": flag, 
+                    "flag": flag,
                     "approve": approve,
                 },
             )
@@ -416,14 +416,14 @@ class NCAPIGroup(NCAPIMessage):
             return (
                 "set_group_add_request",
                 {
-                    "flag": flag, 
-                    "approve": approve, 
+                    "flag": flag,
+                    "approve": approve,
                     "reason": reason,
                 },
             )
 
     async def get_group_info_ex(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群信息(拓展)
@@ -433,15 +433,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_info_ex", 
+            "get_group_info_ex",
             {
                 "group_id": group_id,
             },
         )
 
     async def create_group_file_folder(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         folder_name: str,
     ) -> Any:
         """创建群文件文件夹
@@ -454,14 +454,14 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "create_group_file_folder",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "folder_name": folder_name,
             },
         )
 
     async def delete_group_file(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         file_id: str,
     ) -> Any:
         """删除群文件
@@ -472,16 +472,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "delete_group_file", 
+            "delete_group_file",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "file_id": file_id,
             },
         )
 
     async def delete_group_folder(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         folder_id: str,
     ) -> Any:
         """删除群文件文件夹
@@ -492,15 +492,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "delete_group_folder", 
+            "delete_group_folder",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "folder_id": folder_id,
             },
         )
 
     async def get_group_file_system_info(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群文件系统信息
@@ -510,14 +510,14 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_file_system_info", 
+            "get_group_file_system_info",
             {
                 "group_id": group_id,
             },
         )
 
     async def get_group_root_files(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群根目录文件列表
@@ -527,16 +527,16 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_root_files", 
+            "get_group_root_files",
             {
                 "group_id": group_id,
             },
         )
 
     async def get_group_files_by_folder(
-        self, 
-        group_id: Union[int, str], 
-        folder_id: str, 
+        self,
+        group_id: Union[int, str],
+        folder_id: str,
         file_count: int,
     ) -> Any:
         """获取群文件列表
@@ -550,15 +550,15 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "get_group_files_by_folder",
             {
-                "group_id": group_id, 
-                "folder_id": folder_id, 
+                "group_id": group_id,
+                "folder_id": folder_id,
                 "file_count": file_count,
             },
         )
 
     async def get_group_file_url(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         file_id: str,
     ) -> Any:
         """获取群文件URL
@@ -569,17 +569,17 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_file_url", 
+            "get_group_file_url",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "file_id": file_id,
             },
         )
 
     async def get_group_member_info(
-        self, 
-        group_id: Union[int, str], 
-        user_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
+        user_id: Union[int, str],
         no_cache: bool,
     ) -> Any:
         """获取群成员信息
@@ -593,15 +593,15 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "get_group_member_info",
             {
-                "group_id": group_id, 
-                "user_id": user_id, 
+                "group_id": group_id,
+                "user_id": user_id,
                 "no_cache": no_cache,
             },
         )
 
     async def get_group_member_list(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         no_cache: bool = False,
     ) -> Any:
         """获取群成员列表
@@ -612,15 +612,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_member_list", 
+            "get_group_member_list",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "no_cache": no_cache,
             },
         )
 
     async def get_group_honor_info(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群荣誉信息
@@ -630,14 +630,14 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_honor_info", 
+            "get_group_honor_info",
             {
                 "group_id": group_id,
             },
         )
 
     async def get_group_at_all_remain(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群 @全体成员 剩余次数
@@ -647,14 +647,14 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_at_all_remain", 
+            "get_group_at_all_remain",
             {
                 "group_id": group_id,
             },
         )
 
     async def get_group_ignored_notifies(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群过滤系统消息
@@ -664,14 +664,14 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_ignored_notifies", 
+            "get_group_ignored_notifies",
             {
                 "group_id": group_id,
             },
         )
 
     async def set_group_sign(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """群打卡
@@ -681,14 +681,14 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "set_group_sign", 
+            "set_group_sign",
             {
                 "group_id": group_id,
             },
         )
 
     async def send_group_sign(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """群打卡
@@ -698,15 +698,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "send_group_sign", 
+            "send_group_sign",
             {
                 "group_id": group_id,
             },
         )
 
     async def get_ai_characters(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         chat_type: Union[int, str],
     ) -> Any:
         """获取AI语音人物
@@ -717,17 +717,17 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_ai_characters", 
+            "get_ai_characters",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "chat_type": chat_type,
             },
         )
 
     async def send_group_ai_record(
-        self, 
-        group_id: Union[int, str], 
-        character: str, 
+        self,
+        group_id: Union[int, str],
+        character: str,
         text: str,
     ) -> Any:
         """发送群AI语音
@@ -741,16 +741,16 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "send_group_ai_record",
             {
-                "group_id": group_id, 
-                "character": character, 
+                "group_id": group_id,
+                "character": character,
                 "text": text,
             },
         )
 
     async def get_ai_record(
-        self, 
-        group_id: Union[int, str], 
-        character: str, 
+        self,
+        group_id: Union[int, str],
+        character: str,
         text: str,
     ) -> Any:
         """获取AI语音
@@ -764,15 +764,15 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "get_ai_record",
             {
-                "group_id": group_id, 
-                "character": character, 
+                "group_id": group_id,
+                "character": character,
                 "text": text,
             },
         )
 
     async def forward_group_single_msg(
-        self, 
-        message_id: str, 
+        self,
+        message_id: str,
         group_id: Union[int, str],
     ) -> Any:
         """转发群聊消息
@@ -785,14 +785,14 @@ class NCAPIGroup(NCAPIMessage):
         return (
             "forward_group_single_msg",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "message_id": message_id,
             },
         )
 
     async def send_group_forward_msg(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         messages: str,
     ) -> Any:
         """合并转发的群聊消息
@@ -812,9 +812,9 @@ class NCAPIGroup(NCAPIMessage):
                 "group_id": group_id,
             },
         )
-    
+
     async def get_group_shut_list(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """获取群禁言列表
@@ -824,15 +824,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "get_group_shut_list", 
+            "get_group_shut_list",
             {
                 "group_id": group_id,
             },
         )
-    
+
     async def del_group_notice(
-        self, 
-        group_id: Union[int, str], 
+        self,
+        group_id: Union[int, str],
         notice_id: str,
     ) -> Any:
         """删除群公告
@@ -843,15 +843,15 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "_del_group_notice", 
+            "_del_group_notice",
             {
-                "group_id": group_id, 
+                "group_id": group_id,
                 "notice_id": notice_id,
             },
         )
-    
+
     async def mark_group_msg_as_read(
-        self, 
+        self,
         group_id: Union[int, str],
     ) -> Any:
         """设置群聊已读
@@ -861,12 +861,12 @@ class NCAPIGroup(NCAPIMessage):
             API响应数据
         """
         return (
-            "mark_group_msg_as_read", 
+            "mark_group_msg_as_read",
             {
                 "group_id": group_id,
             },
         )
-    
+
     async def get_group_msg_history(
         self,
         group_id: Union[int, str],
@@ -892,7 +892,7 @@ class NCAPIGroup(NCAPIMessage):
                 "reverseOrder": reverse_order,
             },
         )
-    
+
     async def set_group_remark(
         self,
         group_id: Union[int, str],

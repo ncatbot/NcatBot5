@@ -22,25 +22,25 @@ from your_websocket_client import AioHttpWebSocketClient, MessageType
 async def main():
     # 设置日志
     logging.basicConfig(level=logging.INFO)
-    
+
     # 创建客户端
     async with AioHttpWebSocketClient(
         uri="wss://echo.websocket.org",
         heartbeat=30,
         reconnect_attempts=3
     ) as client:
-        
+
         # 注册消息处理器
         async def message_handler(msg, msg_type):
             if msg_type == MessageType.TEXT:
                 print(f"收到消息: {msg}")
-        
+
         callback = await client.register_callback(message_handler)
-        
+
         # 发送消息
         await client.send("Hello, WebSocket!")
         await asyncio.sleep(2)
-        
+
         # 取消注册
         await client.unregister_callback(callback)
 
@@ -93,7 +93,7 @@ async def text_handler(message, msg_type):
         print(f"文本消息: {message}")
 
 callback = await client.register_callback(
-    text_handler, 
+    text_handler,
     message_type=MessageType.TEXT
 )
 
@@ -117,8 +117,8 @@ try:
     response = await client.request(
         request={"type": "ping", "id": 123},
         response_matcher=lambda msg: (
-            isinstance(msg, str) and 
-            '"type":"pong"' in msg and 
+            isinstance(msg, str) and
+            '"type":"pong"' in msg and
             '"id":123' in msg
         ),
         timeout=5.0
@@ -138,14 +138,14 @@ try:
     # 连续获取消息
     while True:
         message, msg_type = await client.get_stream_message(
-            stream_id, 
+            stream_id,
             timeout=10.0
         )
         if message is not None:
             print(f"流消息: {message}")
         else:
             print("流消息超时")
-            
+
 except ListenerEvictedError:
     print("流被淘汰（背压策略）")
 finally:
@@ -182,7 +182,7 @@ client = AioHttpWebSocketClient(
 
 ```python
 client = AioHttpWebSocketClient(
-    uri="wss://example.com", 
+    uri="wss://example.com",
     backpressure_policy=BackpressurePolicy.DROP_NEW
 )
 # 适合关键数据场景，如交易指令
@@ -234,7 +234,7 @@ def light_callback(message, msg_type):
     quick_processing(message)
 
 await client.register_callback(
-    light_callback, 
+    light_callback,
     execution_mode=ExecutionMode.SYNC
 )
 ```
@@ -259,38 +259,38 @@ class StockClient:
             send_queue_size=5000
         )
         self.subscriptions = set()
-    
+
     async def start(self):
         await self.client.start()
-        
+
         # 注册行情处理器
         await self.client.register_callback(
             self._handle_quote,
             filter_func=lambda msg: 'price' in msg,
             execution_mode=ExecutionMode.THREADED
         )
-    
+
     async def subscribe(self, symbol: str):
         self.subscriptions.add(symbol)
         await self.client.send({
             "action": "subscribe",
             "symbol": symbol
         })
-    
+
     async def unsubscribe(self, symbol: str):
         self.subscriptions.discard(symbol)
         await self.client.send({
-            "action": "unsubscribe", 
+            "action": "unsubscribe",
             "symbol": symbol
         })
-    
+
     def _handle_quote(self, message, msg_type):
         # 在线程池中处理密集计算
         data = json.loads(message)
         if data.get('symbol') in self.subscriptions:
             # 处理行情数据
             print(f"价格更新: {data['symbol']} - {data['price']}")
-    
+
     async def get_current_price(self, symbol: str, timeout: float = 5.0):
         # 请求当前价格
         return await self.client.request(
@@ -300,21 +300,21 @@ class StockClient:
             ),
             timeout=timeout
         )
-    
+
     async def stop(self):
         await self.client.stop()
 
 async def main():
     stock_client = StockClient()
     await stock_client.start()
-    
+
     try:
         await stock_client.subscribe("AAPL")
         await stock_client.subscribe("GOOGL")
-        
+
         # 运行10分钟
         await asyncio.sleep(600)
-        
+
     finally:
         await stock_client.stop()
 
@@ -339,23 +339,23 @@ class ChatClient:
             reconnect_attempts=5
         )
         self.message_stream = None
-    
+
     async def connect(self):
         await self.client.start()
-        
+
         # 加入聊天室
         await self.client.send({
             "type": "join",
             "room": self.room_id,
             "user": self.user_id
         })
-        
+
         # 创建消息流
         self.message_stream = await self.client.create_stream(buffer_size=100)
-        
+
         # 启动消息监听任务
         asyncio.create_task(self._listen_messages())
-    
+
     async def send_message(self, text: str):
         await self.client.send({
             "type": "message",
@@ -364,7 +364,7 @@ class ChatClient:
             "text": text,
             "timestamp": int(time.time())
         })
-    
+
     async def _listen_messages(self):
         try:
             async for message, msg_type in self.client.messages.iter_stream(
@@ -376,7 +376,7 @@ class ChatClient:
                         print(f"{data['user']}: {data['text']}")
         except Exception as e:
             print(f"消息监听错误: {e}")
-    
+
     async def wait_for_join_confirmation(self, timeout: float = 10.0):
         return await self.client.wait_for_message(
             filter_func=lambda msg: (
@@ -384,7 +384,7 @@ class ChatClient:
             ),
             timeout=timeout
         )
-    
+
     async def disconnect(self):
         if self.message_stream:
             await self.client.close_stream(self.message_stream)
@@ -393,20 +393,20 @@ class ChatClient:
 # 使用示例
 async def chat_example():
     chat = ChatClient("general", "user123")
-    
+
     try:
         await chat.connect()
-        
+
         # 等待加入确认
         welcome = await chat.wait_for_join_confirmation()
         print(f"加入成功: {welcome}")
-        
+
         # 发送消息
         await chat.send_message("大家好！")
-        
+
         # 运行一段时间
         await asyncio.sleep(30)
-        
+
     finally:
         await chat.disconnect()
 
@@ -432,21 +432,21 @@ print(f"重连次数: {metrics['reconnection']['attempt_count']}")
 ```python
 async def health_check(client: AioHttpWebSocketClient) -> bool:
     metrics = client.get_metrics()
-    
+
     # 检查连接状态
     if not metrics['running']:
         return False
-    
+
     # 检查错误率
     total_operations = (
-        metrics['connection']['messages_sent'] + 
+        metrics['connection']['messages_sent'] +
         metrics['connection']['messages_received']
     )
     if total_operations > 0:
         error_rate = metrics['connection']['errors'] / total_operations
         if error_rate > 0.1:  # 错误率超过10%
             return False
-    
+
     return True
 ```
 

@@ -23,11 +23,13 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-dependencies = [ # 运行时依赖
+# 运行时依赖
+dependencies = [
     "packaging>=21.3",
     "aiofiles>=23.1.0",
     "PyYAML>=6.0",
     "watchdog>=2.2.0",
+    "aiohttp>=3.13.2",
 ]
 
 [project.optional-dependencies] # 可选依赖
