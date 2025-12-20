@@ -48,33 +48,6 @@ class PluginMixin(ABC):
             raise RuntimeError("混入类尚未附加到插件")
         return self._plugin
 
-    # @property
-    # def context(self) -> "PluginContext":
-    #     """获取宿主插件上下文
-
-    #     Returns:
-    #         插件上下文实例
-    #     """
-    #     return self.plugin.context
-
-    # @context.setter
-    # def context(self, value: "PluginContext") -> None:
-    #     """获取宿主插件上下文
-
-    #     Returns:
-    #         插件上下文实例
-    #     """
-    #     self.plugin.context = value
-
-    # @property
-    # def logger(self):
-    #     """获取宿主插件上下文
-
-    #     Returns:
-    #         插件上下文实例
-    #     """
-    #     return self.plugin.logger
-
     def _set_plugin(self, value):
         """设置宿主插件实例
 

@@ -41,6 +41,8 @@ class DefaultPluginFinder(PluginFinder):
         sources: List[PluginSource] = []
 
         for plugin_dir in self.plugin_dirs:
+            print(plugin_dir)
+            print(not await aiofiles.os.path.exists(plugin_dir))
             if not await aiofiles.os.path.exists(plugin_dir):
                 continue
 

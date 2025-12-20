@@ -187,7 +187,7 @@ class PluginMeta(ABCMeta):
         cls, name: str, bases: Tuple[type, ...], attrs: Dict[str, Any]
     ) -> None:
         super().__init__(name, bases, attrs)
-        if ABC in bases:
+        if getattr(cls, "__abstractmethods__", None):  # 这里用真值判断即可
             return
 
         # 验证必需属性
@@ -437,7 +437,7 @@ class Plugin(ABC, metaclass=PluginMeta):
                 if hasattr(mixin_class, "on_mixin_load"):
                     try:
                         method = getattr(mixin_class, "on_mixin_load")
-                        result = method(self)
+                        result = await method(self)
                         if asyncio.iscoroutine(result):
                             await result
                         self._mixin_loaded.add(mixin_class)
@@ -452,7 +452,7 @@ class Plugin(ABC, metaclass=PluginMeta):
                 if hasattr(mixin_class, "on_mixin_unload"):
                     try:
                         method = getattr(mixin_class, "on_mixin_unload")
-                        result = method(self)
+                        result = await method(self)
                         if asyncio.iscoroutine(result):
                             await result
                         self.logger.debug(f"混入类 {mixin_class.__name__} 卸载完成")
@@ -580,11 +580,11 @@ class Plugin(ABC, metaclass=PluginMeta):
 
     @abstractmethod
     async def on_load(self) -> None:
-        """插件加载时的回调 - 子类必须实现"""
-        pass
+        """插件加载时的回调 —— 子类允许同步或异步实现"""
+        raise NotImplementedError
 
     async def on_unload(self) -> None:
-        """插件卸载时的回调 - 子类可以覆盖"""
+        """插件卸载时的回调 - 子类允许同步或异步实现"""
         self.logger.info(f"插件 {self.name} 正在关闭...")
 
     def _set_status(

@@ -44,7 +44,7 @@ class Bot:
         data_dir: Path | str = "data",
     ):
         # 插件系统
-        plugin_dirs = list(DefaultSetting.sys_plugins)
+        plugin_dirs = [Path(__file__).resolve().parent / "sys_plugin"]
         if plugin_dir:
             plugin_dirs.append(plugin_dir)
 
@@ -146,7 +146,7 @@ class Bot:
 
         # print(1)
         raw = await ws.get_message(listener_id)
-        print(raw)
+        print(raw[0])
         if raw:
             event = protocol._parse_event(raw)  # 无阻塞
             # await asyncio.sleep(0.1)
@@ -199,3 +199,47 @@ class Bot:
 
     async def __aexit__(self, exc_type, exc, tb):
         await self.stop()
+
+
+# 在文件末尾追加
+if __name__ == "__main__":
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(prog="bot", description="机器人框架 CLI：启动、停止、查看状态等。")
+    sub = parser.add_subparsers(dest="cmd", help="子命令")
+
+    # start
+    p_start = sub.add_parser("start", help="启动 Bot")
+    p_start.add_argument("-u", "--url", required=True, help="WebSocket 地址")
+    p_start.add_argument("-t", "--token", help="鉴权 token")
+    p_start.add_argument("-p", "--protocol", default="napcat", help="协议类型")
+    p_start.add_argument("--plugin-dir", type=Path, help="额外插件目录")
+    p_start.add_argument("--config-dir", type=Path, default="config", help="配置目录")
+    p_start.add_argument("--data-dir", type=Path, default="data", help="数据目录")
+
+    # stop / status / reload 等可后续扩展
+    # p_stop = sub.add_parser("stop", help="停止 Bot（暂未实现）")
+    # p_status = sub.add_parser("status", help="查看运行状态（暂未实现）")
+
+    args = parser.parse_args()
+
+    if args.cmd == "start":
+        bot = Bot(
+            url=args.url,
+            token=args.token,
+            protocol=args.protocol,
+            plugin_dir=args.plugin_dir,
+            config_dir=args.config_dir,
+            data_dir=args.data_dir,
+        )
+        try:
+            bot.run()
+        except KeyboardInterrupt:
+            sys.exit(0)
+    # elif args.cmd == "stop":
+    #     print("stop 功能待实现")
+    # elif args.cmd == "status":
+    #     print("status 功能待实现")
+    else:
+        parser.print_help()

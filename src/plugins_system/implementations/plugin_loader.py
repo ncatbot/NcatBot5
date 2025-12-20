@@ -73,7 +73,9 @@ class DefaultPluginLoader(PluginLoader):
         except PluginNotFound:
             logger.warning(f"{source.path.relative_to('.')})没有找到插件")
         except Exception as e:
-            logger.error(f"从源({source.path})加载插件失败: {e}")
+            logger.error("从源(%s)加载插件失败: %s", source.path, e, exc_info=True)
+            if self.debug_mode:
+                raise  # 直接 raise 会把原异常原样冒泡，堆栈保持完整
         finally:
             return _plugins
 

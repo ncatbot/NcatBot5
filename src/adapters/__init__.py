@@ -3,22 +3,24 @@
 """
 from ..abc.api_base import APIBase
 
-# 重新导出核心类型，方便用户导入
+# 重新导出核心类型，方便协议导入
 from ..core.IM import (
-    AtNode,
-    FileNode,
     Group,
     GroupInfo,
-    ImageNode,
     Me,
     Message,
     MessageContent,
     MessageInfo,
     MessageNode,
-    ReplyNode,
-    TextNode,
     User,
     UserInfo,
+)
+from ..core.nodes import (
+    AtNode,
+    FileNode,
+    ImageNode,
+    ReplyNode,
+    TextNode,
     VideoNode,
     VoiceNode,
 )

@@ -231,3 +231,4 @@ pack.sh
 doc.txt
 .vscode
 digest.txt
+functest.py

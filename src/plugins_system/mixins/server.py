@@ -915,16 +915,16 @@ class ServiceResolver(LazyDecoratorResolver):
 
             if uuid_:
                 plugin.logger.info(
-                    f"✅ 服务注册成功: '{service_name}' v{version} "
+                    f"服务注册成功: '{service_name}' v{version} "
                     f"(事件模式: {event_mod}, 标签: {tags})"
                 )
             else:
-                plugin.logger.error(f"❌ 服务注册失败: '{service_name}'")
+                plugin.logger.error(f"服务注册失败: '{service_name}'")
 
         except KeyError as e:
-            plugin.logger.error(f"❌ 服务注册缺少必要参数: {e}")
+            plugin.logger.error(f"服务注册缺少必要参数: {e}")
         except Exception as e:
-            plugin.logger.error(f"❌ 服务注册异常: {e}")
+            plugin.logger.error(f"服务注册异常: {e}")
         finally:
             self.clear_cache()
 

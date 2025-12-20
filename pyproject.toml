@@ -37,6 +37,7 @@ build = ["build", "twine"]
 lint = ["ruff", "black", "isort"]
 test = ["pytest"]
 dev = ["pre-commit", "lint", "test"]
+ai-helper = ["gitingest"]
 
 # [project.urls]
 # "Homepage" = "https://example.com/"   # replace with actual project URL
