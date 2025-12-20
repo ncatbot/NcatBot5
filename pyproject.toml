@@ -33,7 +33,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies] # 可选依赖
-wheel = ["build", "twine"]
+build = ["build", "twine"]
+lint = ["ruff", "black", "isort"]
+test = ["pytest"]
+dev = ["pre-commit", "lint", "test"]
 
 # [project.urls]
 # "Homepage" = "https://example.com/"   # replace with actual project URL

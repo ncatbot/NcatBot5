@@ -12,8 +12,7 @@
 
 - 在 GitHub Actions 中：已配置 workflow 调用 `python -m cat.ci`（详见 `.github/workflows/pre_build.yml`）。
 - 在本地：安装 `pre-commit`，然后运行 `pre-commit install` 即可在每次提交前自动调用 `python -m cat.precommit`。
-自动修复（格式化/修复）
-
+  自动修复（格式化/修复）
 - 已在 `.pre-commit-config.yaml` 中增加自动修复工具：`black`、`isort`、`ruff` 等会在提交时自动修复格式问题。
 - 本地手动修复（对仓库所有文件）可运行：
 
@@ -33,3 +32,5 @@
 - `FCAT_SKIP_TESTS=1`：在单元测试中使用，跳过执行 pytest（用于避免在测试中嵌套运行 pytest）。
 
 注：这些脚本旨在作为最小包装器用于 CI 与本地自动化，减少 workflow/钩子中的详细描述并一致化行为。
+
+这是一只勤劳的猫猫

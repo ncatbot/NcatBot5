@@ -152,7 +152,7 @@ def main() -> int:
     # 3) 运行构建前的检查/修复（将构建钩子移到提前检查并允许本地自动修复）
     try:
         # 以非 dry-run 模式运行，允许修改文件并在必要时进行 git add
-        hatch_hooks._update_license_year(dry_run=False)
+        hatch_hooks._write_mit_license(dry_run=False)
         try:
             hatch_hooks._update_meta_copy_and_version_check(dry_run=False)
         except SystemExit as e:

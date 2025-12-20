@@ -21,10 +21,8 @@ from typing import Optional
 LOG = logging.getLogger("fcatbot.hatch_hooks")
 
 ROOT = Path(__file__).resolve().parent.parent
-PYPROJECT = ROOT / "pyproject.toml"
 LICENSE = ROOT / "License.txt"
 META = ROOT / "src" / "meta.py"
-
 YEAR = datetime.now().year
 DRY_RUN = os.environ.get("HC_DRY_RUN", "0") in ("1", "true", "True")
 
@@ -55,41 +53,53 @@ def _get_latest_git_tag() -> Optional[str]:
         return None
 
 
-def _update_license_year(dry_run: bool | None = None) -> bool:
-    """更新 `License.txt` 的年份。
+# -------------------------------------------------
+# 1. 从 src/meta.py 里提取 __copyright__ 的作者名
+# -------------------------------------------------
+def _get_copyright_owner() -> str:
+    """返回 src/meta.py 里双引号或单引号包着的版权所有者，失败则回退到项目名。"""
+    if not META.exists():
+        return "Fcatbot Contributors"  # 兜底
+    txt = META.read_text(encoding="utf-8")
+    m = re.search(r'__copyright__\s*=\s*["\'].*?(\d{4})\s+([^"\']+)["\']', txt)
+    return m.group(2).strip() if m else "Fcatbot Contributors"
 
-    参数 dry_run 用于覆盖模块级 DRY_RUN（当为 None 时使用 DRY_RUN）。
-    """
+
+# -------------------------------------------------
+# 2. 全新生成 License.txt
+# -------------------------------------------------
+def _write_mit_license(*, dry_run: bool | None = None) -> bool:
+    """生成一份全新的 MIT License.txt"""
     if dry_run is None:
         dry_run = DRY_RUN
 
-    if not LICENSE.exists():
-        LOG.warning("未找到 %s，跳过 License 年份更新", LICENSE)
-        return False
+    owner = _get_copyright_owner()
+    content = f"""{owner} (c) {YEAR}
 
-    txt = LICENSE.read_text(encoding="utf-8")
+MIT License
 
-    # 替换类似版权行中的结束年份，例如 (c) 2020 或 2019-2024
-    def repl(m: re.Match) -> str:
-        prefix = m.group(1)
-        start = m.group(2)
-        end = m.group(3)
-        if end:
-            new = f"{prefix}{start}-{YEAR}"
-        else:
-            new = f"{prefix}{YEAR}"
-        return new
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-    new_txt, n = re.subn(
-        r"(Copyright(?:\s*\(c\))?\s+)(\d{4})(?:-(\d{4}))?", repl, txt, flags=re.I
-    )
-    if n:
-        LOG.info("更新 %s (%d 次替换)", LICENSE, n)
-        if not dry_run:
-            LICENSE.write_text(new_txt, encoding="utf-8")
-        return True
-    LOG.debug("在 %s 中未找到版权模式，跳过", LICENSE)
-    return False
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+    LOG.info("生成新的 MIT License.txt  （作者=%s，年份=%s）", owner, YEAR)
+    if not dry_run:
+        LICENSE.write_text(content, encoding="utf-8")
+    return True
 
 
 def _update_meta_copy_and_version_check(dry_run: bool | None = None) -> bool:
@@ -141,15 +151,15 @@ def _update_meta_copy_and_version_check(dry_run: bool | None = None) -> bool:
 
 
 def pre_build(*_args, **_kwargs) -> None:
-    """Pre-build hook called by Hatch.
-
-    It performs file updates and raises SystemExit to abort build on failures.
+    """
+    Pre-build 预建钩子
+    执行文件更新并引发SystemExit以在失败时中止构建
     """
     logging.basicConfig(level=logging.INFO)
     LOG.info("运行 pre-build 钩子（dry-run=%s）", DRY_RUN)
 
     try:
-        updated_license = _update_license_year()
+        updated_license = _write_mit_license()  # ← 只改这一行
         updated_meta = _update_meta_copy_and_version_check()
     except SystemExit:
         LOG.exception("pre-build 检查失败，终止构建")
