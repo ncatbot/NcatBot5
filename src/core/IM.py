@@ -113,6 +113,8 @@ class Message:
         self._group_id = group_id
         self._reply_to = reply_to
         self._forward_from = forward_from
+        from .client import IMClient
+
         self._client = IMClient.get_current()
         if not self._client:
             raise ValueError("没有选择协议")

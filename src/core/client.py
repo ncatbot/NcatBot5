@@ -211,14 +211,16 @@ class IMClient:
 
     async def send_text_to_group(self, group_id: GroupID, text: str) -> "Message":
         """发送文本到群组"""
-        from .IM import MessageContent, TextNode
+        from .IM import MessageContent
+        from .nodes import TextNode
 
         content = MessageContent(nodes=[TextNode(content=text)])
         return await self.send_group_message(group_id, content)
 
     async def send_text_to_user(self, user_id: UserID, text: str) -> "Message":
         """发送文本到用户"""
-        from .IM import MessageContent, TextNode
+        from .IM import MessageContent
+        from .nodes import TextNode
 
         content = MessageContent(nodes=[TextNode(content=text)])
         return await self.send_private_message(user_id, content)

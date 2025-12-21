@@ -1,4 +1,4 @@
-# from src import PluginBase
+# from src import PluginBase, User
 # from src.plugins_system.mixins.server import ServiceMixin, ServiceName, ServiceMeta, online_service
 # from src.plugins_system.utils.types import PluginName, PluginVersion
 # from logging import Logger
@@ -10,6 +10,7 @@
 #     async def on_load(self):
 #         # self.register_service(ServiceName("demo_service"), self.bili_ck, event_mod=False)
 #         self.logger.info("Service started")
+#         await User('3123651157').send_text("DemoSer_plugin loaded")
 
 #     @online_service("demo_service", event_mod=False)
 #     async def bili_ck(self, meta: ServiceMeta):
