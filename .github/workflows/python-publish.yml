@@ -13,17 +13,17 @@ jobs:
     steps:
       # 1. 检出源码
       - name: 检出源码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # 2. 安装 Python 3.13（官方最新 v5）
       - name: 安装 Python 3.13
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
       # 3. 缓存 pip
       - name: 缓存 pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
@@ -39,7 +39,7 @@ jobs:
 
       # 6. 上传产物供发布 job 使用
       - name: 上传构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: dist/
@@ -52,14 +52,14 @@ jobs:
     steps:
       # 1. 下载构建产物（无需再次检出）
       - name: 下载构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: dist
           path: dist/
 
       # 2. 安装 Python & twine
       - name: 安装 Python 3.13
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
