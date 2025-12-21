@@ -1,0 +1,38 @@
+name: 自动打 tag 并推送
+
+on:
+  push:
+    branches: [ main ]   # 只在 main 分支跑
+    paths: [ 'src/meta.py' ]   # 版本文件变化才触发，可省
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:          # 关键点：给 GITHUB_TOKEN 写权限
+      contents: write
+    steps:
+      - name: 检出源码（需要完整历史）
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # 必须 0，否则 push tag 会失败
+
+      - name: 提取新版本号
+        id: version
+        run: |
+          VERSION=$(grep -P '__version__\s*=' my_package/__version__.py | cut -d\" -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 创建并推送 tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          # 如果 tag 已存在就跳过
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG 已存在，跳过"
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
