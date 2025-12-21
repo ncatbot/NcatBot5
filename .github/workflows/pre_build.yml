@@ -49,4 +49,4 @@ jobs:
       - name: 运行 CI 入口（测试 & 预构建干跑）
         env:
           HC_DRY_RUN: "1"   # 告诉 hatch 只做检查
-        run: python -m cat.ci
+        run: python -m cat.cil test
