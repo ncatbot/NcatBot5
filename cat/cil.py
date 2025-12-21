@@ -250,6 +250,7 @@ def main() -> int:
 
     try:
         if args.command == "ci":
+            run_precommit_check()
             return run_ci_pipeline()
 
         elif args.command == "precommit":
