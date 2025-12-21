@@ -226,7 +226,7 @@ pack.zip
 test.py
 data
 logs
-dist-*.zip
+release*
 pack.sh
 doc.txt
 .vscode
