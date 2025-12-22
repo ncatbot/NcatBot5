@@ -1,102 +1,82 @@
-import datetime as dt
-from dataclasses import dataclass
-from typing import Optional
-
-from ..utils.typec import MsgId, UserID
+# ========== 消息节点 ==========
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
 
 
-# ========== 消息节点系统 ==========
-class MessageNode:
-    """消息节点父类"""
+class MessageNode(ABC):
+    """消息节点抽象基类 - 所有消息节点的父类"""
 
+    @abstractmethod
     def __str__(self) -> str:
-        return ""
+        """获取节点的字符串表示"""
+        pass
 
+    def __repr__(self) -> str:
+        """获取节点的调试表示"""
+        attrs = []
+        for key, value in self.__dict__.items():
+            if not key.startswith("_"):
+                # 截断长字符串以便显示
+                if isinstance(value, str) and len(value) > 50:
+                    value = f"{value[:50]}..."
+                attrs.append(f"{key}={value!r}")
 
-@dataclass
-class TextNode(MessageNode):
-    content: str
-    bold: bool = False
-    italic: bool = False
-    underline: bool = False
-    color: Optional[str] = None
+        class_name = self.__class__.__name__
+        if attrs:
+            return f"{class_name}({', '.join(attrs)})"
+        return f"{class_name}()"
 
-    def __str__(self) -> str:
-        return self.content
+    @property
+    @abstractmethod
+    def type(self) -> str:
+        """节点类型标识符（如：text, image, audio等）"""
+        pass
 
+    @abstractmethod
+    def to_dict(self) -> Dict[str, Any]:
+        """将节点转换为字典表示"""
+        result = {"type": self.type}
 
-@dataclass
-class ImageNode(MessageNode):
-    uri: str
-    width: Optional[int] = None
-    height: Optional[int] = None
-    thumbnail: Optional[str] = None
-    alt_text: Optional[str] = None
+        # 只包含非私有属性
+        for key, value in self.__dict__.items():
+            if not key.startswith("_"):
+                result[key] = value
 
-    def __str__(self) -> str:
-        return self.alt_text or "[图片]"
+        return result
 
+    def to_json(self) -> str:
+        """将节点转换为JSON字符串"""
+        import json
 
-@dataclass
-class FileNode(MessageNode):
-    name: str
-    uri: str
-    size: int
-    file_type: str
+        return json.dumps(self.to_dict(), ensure_ascii=False)
 
-    def __str__(self) -> str:
-        return f"[文件] {self.name}"
+    def __eq__(self, other: Any) -> bool:
+        """比较两个节点是否相等"""
+        if not isinstance(other, MessageNode):
+            return False
 
+        # 比较类型和所有属性
+        if self.type != other.type:
+            return False
 
-@dataclass
-class VoiceNode(MessageNode):
-    url: str
-    duration: int
+        return self.__dict__ == other.__dict__
 
-    def __str__(self) -> str:
-        return "[语音]"
+    def __hash__(self) -> int:
+        """计算节点的哈希值"""
+        return hash((self.type, tuple(sorted(self.__dict__.items()))))
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> Optional["MessageNode"]:
+        """从字典创建节点（工厂方法）"""
+        # 这是一个通用工厂方法，需要子类实现具体逻辑
+        # 或者可以由一个注册表来处理
 
-@dataclass
-class VideoNode(MessageNode):
-    url: str
-    duration: int
-    width: int
-    height: int
-    thumbnail: Optional[str] = None
+        # NODE_REGISTRY  # 假设有一个节点注册表
 
-    def __str__(self) -> str:
-        return "[视频]"
+        # node_type = data.get("type")
+        # if node_type in NODE_REGISTRY:
+        #     node_class = NODE_REGISTRY[node_type]
+        #     # 创建节点实例，传入剩余的参数
+        #     return node_class(**{k: v for k, v in data.items() if k != "type"})
 
-
-@dataclass
-class AtNode(MessageNode):
-    user_id: Optional[UserID]
-    user_name: Optional[str]
-    is_all: bool
-
-    def __str__(self) -> str:
-        if self.is_all:
-            return "@all"
-        return f"@{self.user_name or self.user_id}"
-
-
-@dataclass
-class ReplyNode(MessageNode):
-    message_id: MsgId
-    sender_id: UserID
-    preview: str
-
-    def __str__(self) -> str:
-        return f"[回复 {self.preview}]"
-
-
-@dataclass
-class ForwardNode(MessageNode):
-    message_id: MsgId
-    sender_id: UserID
-    preview: str
-    timestamp: dt.datetime
-
-    def __str__(self) -> str:
-        return f"[转发 {self.preview}]"
+        return None

@@ -1,5 +1,8 @@
 from src import Bot
 
-bot = Bot(url="ws://192.168.3.20:3003")
+bot = Bot(
+    url="ws://192.168.3.20:3003",
+    plugin_dir="plugins",
+)
 
 bot.run()
