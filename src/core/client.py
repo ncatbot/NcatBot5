@@ -7,7 +7,12 @@ import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Self
 
 if TYPE_CHECKING:
-    from .IM import Message, User, Group, Me, MessageContent
+    from .IM import (
+        Message,
+        User,
+        Group,
+        Me,
+    )
     from ..abc.api_base import APIBase
 
 from ..abc.protocol_abc import ProtocolABC
@@ -118,17 +123,17 @@ class IMClient:
     # ========== 核心方法 ==========
 
     async def send_group_message(
-        self, group_id: GroupID, content: "MessageContent"
+        self,
+        group_id: GroupID,
+        msg: "Message",
     ) -> "Message":
         """发送群消息"""
-        response = await self.protocol.send_group_message(group_id, content)
+        response = await self.protocol.send_group_message(group_id, msg)
         return self.protocol._parse_message(response)
 
-    async def send_private_message(
-        self, user_id: UserID, content: "MessageContent"
-    ) -> "Message":
+    async def send_private_message(self, user_id: UserID, msg: "Message") -> "Message":
         """发送私聊消息"""
-        response = await self.protocol.send_private_message(user_id, content)
+        response = await self.protocol.send_private_message(user_id, msg)
         return self.protocol._parse_message(response)
 
     async def recall_message(self, msg_id: MsgId) -> bool:
@@ -206,24 +211,6 @@ class IMClient:
             users.append(self.protocol._parse_user(user_data))
 
         return users
-
-    # ========== 便捷方法 ==========
-
-    async def send_text_to_group(self, group_id: GroupID, text: str) -> "Message":
-        """发送文本到群组"""
-        from .IM import MessageContent
-        from .nodes import TextNode
-
-        content = MessageContent(nodes=[TextNode(content=text)])
-        return await self.send_group_message(group_id, content)
-
-    async def send_text_to_user(self, user_id: UserID, text: str) -> "Message":
-        """发送文本到用户"""
-        from .IM import MessageContent
-        from .nodes import TextNode
-
-        content = MessageContent(nodes=[TextNode(content=text)])
-        return await self.send_private_message(user_id, content)
 
     # ========== 好友管理方法 ==========
     # @unsupported_warning

@@ -6,11 +6,10 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import uuid
 from collections.abc import Iterable, Iterator, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 if TYPE_CHECKING:
     from .client import IMClient
@@ -81,24 +80,26 @@ class MessageInfo:
 
 
 # ---------------- 消息链（仅依赖 MessageNode） ----------------
-class MessageChain(Sequence[MessageNode]):
+class MessageChain(Sequence[Union[MessageNode, str]]):
+    """消息链，可以包含 MessageNode 或原生字符串"""
+
     __slots__ = ("_nodes",)
 
-    def __init__(self, nodes: Iterable[MessageNode] | None = None):
-        self._nodes: tuple[MessageNode, ...] = tuple(nodes) if nodes else ()
+    def __init__(self, nodes: Iterable[Union[MessageNode, str]] | None = None):
+        self._nodes: tuple[Union[MessageNode, str], ...] = tuple(nodes) if nodes else ()
 
     # Sequence 接口
-    def __getitem__(self, index: int | slice) -> MessageNode | MessageChain:
-        return (
-            MessageChain(self._nodes[index])
-            if isinstance(index, slice)
-            else self._nodes[index]
-        )
+    def __getitem__(
+        self, index: int | slice
+    ) -> Union[MessageNode, str, "MessageChain"]:
+        if isinstance(index, slice):
+            return MessageChain(self._nodes[index])
+        return self._nodes[index]
 
     def __len__(self) -> int:
         return len(self._nodes)
 
-    def __iter__(self) -> Iterator[MessageNode]:
+    def __iter__(self) -> Iterator[Union[MessageNode, str]]:
         return iter(self._nodes)
 
     def __repr__(self) -> str:
@@ -113,7 +114,9 @@ class MessageChain(Sequence[MessageNode]):
     def __hash__(self) -> int:
         return hash(self._nodes)
 
-    def __add__(self, other: MessageChain | Iterable[MessageNode]) -> MessageChain:
+    def __add__(
+        self, other: Union["MessageChain", Iterable[Union[MessageNode, str]]]
+    ) -> "MessageChain":
         if isinstance(other, MessageChain):
             return MessageChain(self._nodes + other._nodes)
         return MessageChain(list(self._nodes) + list(other))
@@ -121,74 +124,114 @@ class MessageChain(Sequence[MessageNode]):
     # 工具
     @property
     def text_preview(self) -> str:
-        return "".join(str(node) for node in self._nodes)
+        """获取文本预览"""
+        result = []
+        for node in self._nodes:
+            if isinstance(node, str):
+                result.append(node)
+            else:
+                result.append(str(node))
+        return "".join(result)
 
     # 工厂
     @classmethod
-    def empty(cls) -> MessageChain:
+    def empty(cls) -> "MessageChain":
         return cls()
 
     @classmethod
-    def of(cls, *nodes: MessageNode) -> MessageChain:
+    def of(cls, *nodes: Union[MessageNode, str]) -> "MessageChain":
         return cls(nodes)
 
     @classmethod
-    def from_text(cls, text: str) -> MessageChain:
-        from .IM import TextNode
-
-        return cls([TextNode(content=text)])
+    def from_text(cls, text: str) -> "MessageChain":
+        # 直接使用字符串，不转换为TextNode
+        return cls([text])
 
     @classmethod
-    def from_nodes(cls, nodes: List[MessageNode]) -> MessageChain:
+    def from_nodes(cls, nodes: List[MessageNode]) -> "MessageChain":
         return cls(nodes)
+
+    @classmethod
+    def from_strings(cls, *strings: str) -> "MessageChain":
+        """从多个字符串创建消息链"""
+        return cls(strings)
 
     # 转换
     def to_json(self) -> str:
-        return json.dumps([node.to_dict() for node in self._nodes], ensure_ascii=False)
+        """转换为JSON字符串，协议需要自行处理字符串节点"""
+        nodes_data = []
+        for node in self._nodes:
+            if isinstance(node, str):
+                # 字符串节点，协议需要自行处理
+                nodes_data.append({"type": "text", "content": node})
+            else:
+                # MessageNode，使用其自身的to_dict方法
+                nodes_data.append(node.to_dict())
+        return json.dumps(nodes_data, ensure_ascii=False)
 
-    def to_list(self) -> List[MessageNode]:
-        return deepcopy(list(self._nodes))
+    def to_list(self) -> List[Union[MessageNode, str]]:
+        """返回节点列表的深拷贝"""
+        result = []
+        for node in self._nodes:
+            if isinstance(node, MessageNode):
+                result.append(deepcopy(node))
+            else:
+                # 字符串是不可变的，可以直接使用
+                result.append(node)
+        return result
+
+    def to_raw_list(self) -> List[Union[MessageNode, str]]:
+        """返回原始节点列表（浅拷贝）"""
+        return list(self._nodes)
 
     # 查询
-    def filter(self, predicate) -> MessageChain:
+    def filter(
+        self, predicate: Callable[[Union[MessageNode, str]], bool]
+    ) -> "MessageChain":
+        """过滤节点"""
         return MessageChain(node for node in self._nodes if predicate(node))
 
-    def find_first(self, predicate) -> MessageNode | None:
+    def find_first(
+        self, predicate: Callable[[Union[MessageNode, str]], bool]
+    ) -> Union[MessageNode, str, None]:
+        """查找第一个满足条件的节点"""
         for node in self._nodes:
             if predicate(node):
                 return node
         return None
 
     def contains_type(self, node_type: type) -> bool:
-        return any(isinstance(node, node_type) for node in self._nodes)
+        """检查是否包含指定类型的节点"""
+        return any(
+            isinstance(node, node_type)
+            for node in self._nodes
+            if isinstance(node, MessageNode)
+        )
 
     def get_nodes_by_type(self, node_type: type) -> List[MessageNode]:
+        """获取指定类型的所有节点（只返回MessageNode）"""
         return [node for node in self._nodes if isinstance(node, node_type)]
 
-    @property
-    def text_nodes(self) -> List[MessageNode]:
-        from .IM import TextNode
+    def get_strings(self) -> List[str]:
+        """获取所有字符串节点"""
+        return [node for node in self._nodes if isinstance(node, str)]
 
-        return self.get_nodes_by_type(TextNode)
-
-    @property
-    def text_content(self) -> str:
-        from .IM import TextNode
-
-        return "".join(
-            node.content for node in self._nodes if isinstance(node, TextNode)
-        )
+    def get_message_nodes(self) -> List[MessageNode]:
+        """获取所有MessageNode节点"""
+        return [node for node in self._nodes if isinstance(node, MessageNode)]
 
 
 # ---------------- 引用 / 转发信息（仅依赖 MsgId, UserID） ----------------
 @dataclass(frozen=True)
 class MessageReference:
+    """消息引用信息"""
+
     message_id: MsgId
     sender_id: UserID
     preview: str
     timestamp: dt.datetime
 
-    async def get_message(self) -> Message | None:
+    async def get_message(self) -> Optional["Message"]:
         client = IMClient.get_current()
         if client:
             try:
@@ -197,7 +240,7 @@ class MessageReference:
                 return None
         return None
 
-    async def get_sender(self) -> User | None:
+    async def get_sender(self) -> Optional["User"]:
         client = IMClient.get_current()
         if client:
             try:
@@ -209,12 +252,14 @@ class MessageReference:
 
 @dataclass(frozen=True)
 class ForwardInfo:
+    """转发信息"""
+
     original_message_id: MsgId
     original_sender_id: UserID
     original_timestamp: dt.datetime
     forwarder_id: UserID
 
-    async def get_original_message(self) -> Message | None:
+    async def get_original_message(self) -> Optional["Message"]:
         client = IMClient.get_current()
         if client:
             try:
@@ -223,7 +268,7 @@ class ForwardInfo:
                 return None
         return None
 
-    async def get_original_sender(self) -> User | None:
+    async def get_original_sender(self) -> Optional["User"]:
         client = IMClient.get_current()
         if client:
             try:
@@ -232,7 +277,7 @@ class ForwardInfo:
                 return None
         return None
 
-    async def get_forwarder(self) -> User | None:
+    async def get_forwarder(self) -> Optional["User"]:
         client = IMClient.get_current()
         if client:
             try:
@@ -244,10 +289,12 @@ class ForwardInfo:
 
 # ---------------- 消息实体（依赖 MessageChain / 引用 / 转发） ----------------
 class Message:
-    NORMAL = "normal"
-    REPLY = "reply"
-    FORWARD = "forward"
-    SYSTEM = "system"
+    """消息实体，用于表示一条完整的消息"""
+
+    NORMAL = "normal"  # 普通消息
+    REPLY = "reply"  # 回复消息
+    FORWARD = "forward"  # 转发消息
+    SYSTEM = "system"  # 系统消息
 
     __slots__ = (
         "_id",
@@ -266,22 +313,22 @@ class Message:
 
     def __init__(
         self,
-        msg_id: MsgId,
+        msg_id: MsgId | None,
         sender_id: UserID,
         content: MessageChain,
         timestamp: dt.datetime,
         message_type: str = NORMAL,
         group_id: GroupID | None = None,
-        reference: MessageReference | None = None,
-        forward_info: ForwardInfo | None = None,
+        reference: Optional[MessageReference] = None,
+        forward_info: Optional[ForwardInfo] = None,
     ):
         self._id = msg_id
         self._sender_id = sender_id
-        self._sender_cache: User | None = None
+        self._sender_cache: Optional["User"] = None
         self._content = content
         self._timestamp = timestamp
         self._group_id = group_id
-        self._group_cache: Group | None = None
+        self._group_cache: Optional["Group"] = None
         self._message_type = message_type
         self._reference = reference
         self._forward_info = forward_info
@@ -294,7 +341,7 @@ class Message:
 
     # 只读属性
     @property
-    def id(self) -> MsgId:
+    def id(self) -> Optional[MsgId]:
         return self._id
 
     @property
@@ -310,7 +357,7 @@ class Message:
         return self._timestamp
 
     @property
-    def group_id(self) -> GroupID | None:
+    def group_id(self) -> Optional[GroupID]:
         return self._group_id
 
     @property
@@ -318,11 +365,11 @@ class Message:
         return self._message_type
 
     @property
-    def reference(self) -> MessageReference | None:
+    def reference(self) -> Optional[MessageReference]:
         return self._reference
 
     @property
-    def forward_info(self) -> ForwardInfo | None:
+    def forward_info(self) -> Optional[ForwardInfo]:
         return self._forward_info
 
     @property
@@ -354,16 +401,16 @@ class Message:
         return self._message_type == self.SYSTEM
 
     # 代理到 content
-    def __getitem__(self, index: int | slice) -> MessageNode | MessageChain:
+    def __getitem__(self, index: int | slice) -> Union[MessageNode, str, MessageChain]:
         return self._content[index]
 
     def __len__(self) -> int:
         return len(self._content)
 
-    def __iter__(self) -> Iterator[MessageNode]:
+    def __iter__(self) -> Iterator[Union[MessageNode, str]]:
         return iter(self._content)
 
-    def __contains__(self, item: MessageNode) -> bool:
+    def __contains__(self, item: Any) -> bool:
         return item in self._content
 
     def __repr__(self) -> str:
@@ -380,27 +427,24 @@ class Message:
     def text_preview(self) -> str:
         return self._content.text_preview
 
-    @property
-    def text_content(self) -> str:
-        return self._content.text_content
-
     # 异步获取完整对象
-    async def get_sender(self) -> User:
+    async def get_sender(self) -> "User":
         if self._sender_cache is None:
             self._sender_cache = await self._client.get_user(self._sender_id)
         return self._sender_cache
 
-    async def get_group(self) -> Group | None:
+    async def get_group(self) -> Optional["Group"]:
         if self._group_id is None:
             return None
         if self._group_cache is None:
             self._group_cache = await self._client.get_group(self._group_id)
         return self._group_cache
 
-    async def get_referenced_message(self) -> Message | None:
+    async def get_referenced_message(self) -> Optional["Message"]:
         return await self._reference.get_message() if self._reference else None
 
-    async def get_original_message(self) -> Message | None:
+    async def get_original_message(self) -> Optional["Message"]:
+        """获取转发消息的原始消息"""
         return (
             await self._forward_info.get_original_message()
             if self._forward_info
@@ -408,75 +452,119 @@ class Message:
         )
 
     # 消息操作
-    def as_reply(
-        self,
-        reply_to_msg_id: MsgId,
-        reply_to_sender_id: UserID,
-        reply_to_timestamp: dt.datetime,
-        preview: str | None = None,
-    ) -> Message:
-        return Message(
-            msg_id=self._id,
-            sender_id=self._sender_id,
-            content=self._content,
-            timestamp=self._timestamp,
+    async def reply(self, content: MessageChain) -> "Message":
+        """回复这条消息"""
+        # 构建回复消息
+        reply_msg = Message(
+            msg_id=None,  # 发送时由服务器生成
+            sender_id=self._client.protocol.self_id,
+            content=content,
+            timestamp=dt.datetime.now(),
             message_type=self.REPLY,
             group_id=self._group_id,
             reference=MessageReference(
-                message_id=reply_to_msg_id,
-                sender_id=reply_to_sender_id,
-                preview=preview or self.text_preview[:100],
-                timestamp=reply_to_timestamp,
-            ),
+                message_id=self._id,
+                sender_id=self._sender_id,
+                preview=self.text_preview[:10],
+                timestamp=self._timestamp,
+            )
+            if self._id
+            else None,
         )
 
-    def as_forward(self, forwarder_id: UserID) -> Message:
-        return Message(
-            msg_id=self._id,
-            sender_id=forwarder_id,
+        if self.is_group_message:
+            return await self._client.send_group_message(self._group_id, reply_msg)
+        else:
+            return await self._client.send_private_message(self._sender_id, reply_msg)
+
+    async def reply_text(self, text: str) -> "Message":
+        """用文本回复这条消息"""
+        return await self.reply(MessageChain.from_text(text))
+
+    async def forward_to_user(self, user_id: UserID) -> "Message":
+        """转发消息给指定用户"""
+        msg = Message(
+            msg_id=None,  # 发送时由服务器生成
+            sender_id=self._client.protocol.self_id,
             content=self._content,
             timestamp=dt.datetime.now(),
             message_type=self.FORWARD,
-            group_id=self._group_id,
+            group_id=self._group_id,  # 消息来源群组
             forward_info=ForwardInfo(
                 original_message_id=self._id,
                 original_sender_id=self._sender_id,
                 original_timestamp=self._timestamp,
-                forwarder_id=forwarder_id,
-            ),
+                forwarder_id=self._client.protocol.self_id,
+            )
+            if self._id
+            else None,
         )
 
-    async def reply(self, content: MessageChain) -> Message:
-        if self.is_group_message:
-            return await self._client.send_group_message(self._group_id, content)
-        else:
-            return await self._client.send_private_message(self._sender_id, content)
+        return await self._client.send_private_message(user_id, msg)
 
-    async def reply_text(self, text: str) -> Message:
-        return await self.reply(MessageChain.from_text(text))
+    async def forward_to_group(self, group_id: GroupID) -> "Message":
+        """转发消息到指定群组"""
+        msg = Message(
+            msg_id=None,  # 发送时由服务器生成
+            sender_id=self._client.protocol.self_id,
+            content=self._content,
+            timestamp=dt.datetime.now(),
+            message_type=self.FORWARD,
+            group_id=self._group_id,  # 消息来源群组
+            forward_info=ForwardInfo(
+                original_message_id=self._id,
+                original_sender_id=self._sender_id,
+                original_timestamp=self._timestamp,
+                forwarder_id=self._client.protocol.self_id,
+            )
+            if self._id
+            else None,
+        )
 
-    async def forward_to_user(self, user_id: UserID) -> Message:
-        return await self._client.send_private_message(user_id, self._content)
-
-    async def forward_to_group(self, group_id: GroupID) -> Message:
-        return await self._client.send_group_message(group_id, self._content)
-
-    async def recall(self) -> bool:
-        return await self._client.recall_message(self._id)
+        return await self._client.send_group_message(group_id, msg)
 
     def copy_content(self) -> MessageChain:
+        """复制消息内容"""
         return MessageChain(self._content.to_list())
+
+    @classmethod
+    def create(
+        cls,
+        content: MessageChain,
+        sender_id: Optional[UserID] = None,
+        group_id: Optional[GroupID] = None,
+        reference: Optional[MessageReference] = None,
+    ) -> "Message":
+        """创建一条新消息（用于发送）"""
+        from .client import IMClient
+
+        client = IMClient.get_current()
+        if not client:
+            raise ValueError("没有选择协议")
+
+        if sender_id is None:
+            sender_id = client.protocol.self_id
+
+        return Message(
+            msg_id=None,
+            sender_id=sender_id,
+            content=content,
+            timestamp=dt.datetime.now(),
+            message_type=cls.REPLY if reference else cls.NORMAL,
+            group_id=group_id,
+            reference=reference,
+        )
 
 
 # ---------------- 用户 / 群组 / Me（依赖 Message / MessageChain） ----------------
 class User:
-    _client: IMClient | None = None
+    _client: Optional["IMClient"] = None
 
     def __init__(
         self,
         uid: UserID,
-        nickname: str | None = None,
-        avatar_url: str | None = None,
+        nickname: Optional[str] = None,
+        avatar_url: Optional[str] = None,
     ):
         self._uid = uid
         self._nickname = nickname
@@ -499,7 +587,7 @@ class User:
         self._nickname = user_info.get("nickname", "未知用户")
         return self._nickname
 
-    async def get_avatar_url(self) -> str | None:
+    async def get_avatar_url(self) -> Optional[str]:
         if self._avatar_url:
             return self._avatar_url
         user_info = await self._client.get_user_info(self._uid)
@@ -508,13 +596,40 @@ class User:
 
     # 私聊快捷
     async def send_text(self, text: str) -> Message:
-        return await self._client.send_text_to_user(self._uid, text)
+        """发送文本消息"""
+        message = Message.create(
+            content=MessageChain.from_text(text),
+            sender_id=self._client.protocol.self_id,
+        )
+        return await self._client.send_private_message(self._uid, message)
 
-    async def send_message(self, content: MessageChain) -> Message:
-        return await self._client.send_private_message(self._uid, content)
+    async def send_message(self, message: Message) -> Message:
+        """发送消息"""
+        # 确保消息的发送者是当前用户
+        if message.sender_id != self._client.protocol.self_id:
+            # 如果消息的发送者不是当前用户，重新包装消息
+            new_message = Message(
+                msg_id=None,
+                sender_id=self._client.protocol.self_id,
+                content=message.content,
+                timestamp=dt.datetime.now(),
+                message_type=message.message_type,
+                group_id=None,
+                reference=message.reference,
+            )
+            return await self._client.send_private_message(self._uid, new_message)
+        return await self._client.send_private_message(self._uid, message)
+
+    async def send_message_chain(self, content: MessageChain) -> Message:
+        """发送消息链"""
+        message = Message.create(
+            content=content,
+            sender_id=self._client.protocol.self_id,
+        )
+        return await self._client.send_private_message(self._uid, message)
 
     # 好友管理
-    async def add_friend(self, remark: str | None = None) -> bool:
+    async def add_friend(self, remark: Optional[str] = None) -> bool:
         return await self._client.add_friend(self._uid, remark)
 
     async def delete_friend(self) -> bool:
@@ -555,14 +670,14 @@ class User:
 
 
 class Group:
-    _client: IMClient | None = None
+    _client: Optional["IMClient"] = None
 
     def __init__(
         self,
         gid: GroupID,
-        name: str | None = None,
-        description: str | None = None,
-        avatar_url: str | None = None,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        avatar_url: Optional[str] = None,
     ):
         self._gid = gid
         self._name = name
@@ -584,7 +699,7 @@ class Group:
         return self._name or f"群组 {self._gid}"
 
     @property
-    def avatar_url(self) -> str | None:
+    def avatar_url(self) -> Optional[str]:
         return self._avatar_url
 
     async def get_info(self) -> Dict[str, Any]:
@@ -592,10 +707,42 @@ class Group:
 
     # 群聊快捷
     async def send_text(self, text: str) -> Message:
-        return await self._client.send_text_to_group(self._gid, text)
+        """发送文本消息到群聊"""
+        message = Message.create(
+            content=MessageChain.from_text(text),
+            sender_id=self._client.protocol.self_id,
+            group_id=self._gid,
+        )
+        return await self._client.send_group_message(self._gid, message)
 
-    async def send_message(self, content: MessageChain) -> Message:
-        return await self._client.send_group_message(self._gid, content)
+    async def send_message(self, message: Message) -> Message:
+        """发送消息到群聊"""
+        # 确保消息的发送者是当前用户且目标群组正确
+        if (
+            message.sender_id != self._client.protocol.self_id
+            or message.group_id != self._gid
+        ):
+            # 重新包装消息
+            new_message = Message(
+                msg_id=None,
+                sender_id=self._client.protocol.self_id,
+                content=message.content,
+                timestamp=dt.datetime.now(),
+                message_type=message.message_type,
+                group_id=self._gid,
+                reference=message.reference,
+            )
+            return await self._client.send_group_message(self._gid, new_message)
+        return await self._client.send_group_message(self._gid, message)
+
+    async def send_message_chain(self, content: MessageChain) -> Message:
+        """发送消息链到群聊"""
+        message = Message.create(
+            content=content,
+            sender_id=self._client.protocol.self_id,
+            group_id=self._gid,
+        )
+        return await self._client.send_group_message(self._gid, message)
 
     async def recall_message(self, message_id: MsgId) -> bool:
         return await self._client.recall_message(message_id)
@@ -603,23 +750,25 @@ class Group:
     # 群管理
     @staticmethod
     async def create_group(
-        name: str, initial_members: List[UserID] | None = None
-    ) -> Group:
+        name: str, initial_members: Optional[List[UserID]] = None
+    ) -> "Group":
         client = IMClient.get_current()
         if not client:
             raise ValueError("没有选择协议")
         return await client.create_group(name, initial_members)
 
-    async def set_admin(self, user: User | UserID, is_admin: bool = True) -> bool:
+    async def set_admin(
+        self, user: Union["User", UserID], is_admin: bool = True
+    ) -> bool:
         user_id = user.uid if isinstance(user, User) else user
         return await self._client.set_group_admin(self._gid, user_id, is_admin)
 
-    async def invite_member(self, user: User | UserID) -> bool:
+    async def invite_member(self, user: Union["User", UserID]) -> bool:
         user_id = user.uid if isinstance(user, User) else user
         return await self._client.invite_to_group(self._gid, user_id)
 
     async def remove_member(
-        self, user: User | UserID, reason: str | None = None
+        self, user: Union["User", UserID], reason: Optional[str] = None
     ) -> bool:
         user_id = user.uid if isinstance(user, User) else user
         return await self._client.kick_group_member(self._gid, user_id, reason)
@@ -639,11 +788,11 @@ class Group:
     async def disband(self) -> bool:
         return await self._client.disband_group(self._gid)
 
-    async def transfer_ownership(self, new_owner: User | UserID) -> bool:
+    async def transfer_ownership(self, new_owner: Union["User", UserID]) -> bool:
         new_owner_id = new_owner.uid if isinstance(new_owner, User) else new_owner
         return await self._client.transfer_group_ownership(self._gid, new_owner_id)
 
-    async def get_members(self) -> List[User]:
+    async def get_members(self) -> List["User"]:
         return await self._client.get_group_members(self._gid)
 
     async def leave(self) -> bool:
@@ -655,11 +804,13 @@ class Group:
         return self.info.member_count
 
     @property
-    def owner_id(self) -> UserID | None:
+    def owner_id(self) -> Optional[UserID]:
         return self.info.owner_id
 
 
 class Me(User):
+    """当前登录用户"""
+
     def __new__(cls, *_, **__):
         raise TypeError("Me 不允许直接实例化，请使用 Me.from_user(user) 进行升级")
 
@@ -671,7 +822,7 @@ class Me(User):
         return self._client.protocol.self_id
 
     @classmethod
-    def from_user(cls, user: User) -> Me:
+    def from_user(cls, user: User) -> "Me":
         me = object.__new__(cls)
         me.__dict__.update(user.__dict__)
         if hasattr(user, "_client"):
@@ -702,49 +853,51 @@ class Me(User):
 
 # ---------------- 消息构建器（最后，依赖以上全部） ----------------
 class MessageBuilder:
-    def __init__(self) -> None:
-        self._msg_id: MsgId | None = None
-        self._sender_id: UserID | None = None
-        self._content: MessageChain | None = None
-        self._timestamp: dt.datetime | None = None
-        self._msg_type: str = Message.NORMAL
-        self._group_id: GroupID | None = None
-        self._reference: MessageReference | None = None
-        self._forward_info: ForwardInfo | None = None
+    """消息构建器，用于构建用于发送的消息"""
 
-    def id(self, msg_id: MsgId) -> MessageBuilder:
+    def __init__(self) -> None:
+        self._msg_id: Optional[MsgId] = None
+        self._sender_id: Optional[UserID] = None
+        self._content: Optional[MessageChain] = None
+        self._timestamp: Optional[dt.datetime] = None
+        self._msg_type: str = Message.NORMAL
+        self._group_id: Optional[GroupID] = None
+        self._reference: Optional[MessageReference] = None
+        self._forward_info: Optional[ForwardInfo] = None
+
+    def id(self, msg_id: MsgId) -> "MessageBuilder":
         self._msg_id = msg_id
         return self
 
-    def sender(self, sender_id: UserID) -> MessageBuilder:
+    def sender(self, sender_id: UserID) -> "MessageBuilder":
         self._sender_id = sender_id
         return self
 
-    def content(self, content: MessageChain) -> MessageBuilder:
+    def content(self, content: MessageChain) -> "MessageBuilder":
         self._content = content
         return self
 
-    def text(self, text: str) -> MessageBuilder:
+    def text(self, text: str) -> "MessageBuilder":
         self._content = MessageChain.from_text(text)
         return self
 
-    def timestamp(self, ts: dt.datetime) -> MessageBuilder:
+    def timestamp(self, ts: dt.datetime) -> "MessageBuilder":
         self._timestamp = ts
         return self
 
-    def now(self) -> MessageBuilder:
+    def now(self) -> "MessageBuilder":
         self._timestamp = dt.datetime.now()
         return self
 
-    def type(self, tp: str) -> MessageBuilder:
+    def type(self, tp: str) -> "MessageBuilder":
         self._msg_type = tp
         return self
 
-    def group(self, gid: GroupID) -> MessageBuilder:
+    def group(self, gid: GroupID) -> "MessageBuilder":
         self._group_id = gid
         return self
 
-    def private(self) -> MessageBuilder:
+    def private(self) -> "MessageBuilder":
         self._group_id = None
         return self
 
@@ -753,8 +906,8 @@ class MessageBuilder:
         msg_id: MsgId,
         sender_id: UserID,
         ts: dt.datetime,
-        preview: str | None = None,
-    ) -> MessageBuilder:
+        preview: Optional[str] = None,
+    ) -> "MessageBuilder":
         self._msg_type = Message.REPLY
         self._reference = MessageReference(
             message_id=msg_id,
@@ -770,7 +923,7 @@ class MessageBuilder:
         orig_sender: UserID,
         orig_ts: dt.datetime,
         forwarder: UserID,
-    ) -> MessageBuilder:
+    ) -> "MessageBuilder":
         self._msg_type = Message.FORWARD
         self._forward_info = ForwardInfo(
             original_message_id=msg_id,
@@ -781,6 +934,7 @@ class MessageBuilder:
         return self
 
     def build(self) -> Message:
+        """构建消息（用于发送）"""
         if self._sender_id is None:
             from .client import IMClient
 
@@ -798,11 +952,11 @@ class MessageBuilder:
         if self._content is None:
             self._content = MessageChain.empty()
 
-        if self._msg_id is None:
-            self._msg_id = f"temp_{uuid.uuid4().hex[:8]}"
+        # 发送消息时不需要id，由服务器生成
+        # 只保留id设置，如果用户明确设置了id（如用于构建接收到的消息）
 
         return Message(
-            msg_id=self._msg_id,
+            msg_id=self._msg_id,  # 可以为None
             sender_id=self._sender_id,
             content=self._content,
             timestamp=self._timestamp,

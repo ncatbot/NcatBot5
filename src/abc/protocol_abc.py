@@ -13,7 +13,7 @@ from ..plugins_system.core.events import Event
 
 if TYPE_CHECKING:
     from ..connector.abc import ABCWebSocketClient, MessageType
-    from ..core.IM import Group, Message, MessageContent, User
+    from ..core.IM import Group, Message, User
     from ..utils.typec import GroupID, MsgId, UserID
     from .api_base import APIBase
 
@@ -101,7 +101,7 @@ class ProtocolABC(ABC, metaclass=ProtocolMeta):
 
     @abstractmethod
     async def send_group_message(
-        self, gid: "GroupID", content: "MessageContent"
+        self, gid: "GroupID", content: "Message"
     ) -> RawMessage:
         """
         发送群消息
@@ -115,7 +115,7 @@ class ProtocolABC(ABC, metaclass=ProtocolMeta):
 
     @abstractmethod
     async def send_private_message(
-        self, uid: "UserID", content: "MessageContent"
+        self, uid: "UserID", content: "Message"
     ) -> RawMessage:
         """
         发送私聊消息

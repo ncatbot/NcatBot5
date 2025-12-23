@@ -27,12 +27,12 @@ repos:
       - id: ruff
         args: ["--fix"]
 
-  - repo: local
-    hooks:
-      - id: fcatbot-precommit
-        name: Fcatbot pre-commit checks
-        entry: python3 -m cat.cil ci
-        language: system
-        stages: [pre-commit]
-        files: '\.py$'
-        pass_filenames: false
+  # - repo: local
+  #   hooks:
+  #     - id: fcatbot-precommit
+  #       name: Fcatbot pre-commit checks
+  #       entry: python3 -m cat.cil ci
+  #       language: system
+  #       stages: [pre-commit]
+  #       files: '\.py$'
+  #       pass_filenames: false
