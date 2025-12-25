@@ -433,11 +433,6 @@ class Message:
     def __str__(self) -> str:
         return str(self._content)
 
-    # 便捷属性
-    @property
-    def text_preview(self) -> str:
-        return self._content.text_preview
-
     # 异步获取完整对象
     async def get_sender(self) -> "User":
         if self._sender_cache is None:
@@ -478,7 +473,7 @@ class Message:
             reference=MessageReference(
                 message_id=self._id,
                 sender_id=self._sender_id,
-                preview=self.text_preview[:10],
+                preview=str(self)[:10],
                 timestamp=self._timestamp,
             ),
         )
