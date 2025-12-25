@@ -9,21 +9,12 @@ from ..core.IM import (
     GroupInfo,
     Me,
     Message,
-    MessageContent,
+    MessageBuilder,
     MessageInfo,
-    MessageNode,
     User,
     UserInfo,
 )
-from ..core.nodes import (
-    AtNode,
-    FileNode,
-    ImageNode,
-    ReplyNode,
-    TextNode,
-    VideoNode,
-    VoiceNode,
-)
+from ..core.nodes import MessageNode
 from ..utils.typec import MessageStatus, MessageType, Role, Sex
 
 protocols = ("napcat",)
@@ -51,15 +42,8 @@ __all__ = [
     "Sex",
     "Role",
     # 消息相关
-    "MessageContent",
+    "MessageBuilder",
     "MessageNode",
-    "TextNode",
-    "ImageNode",
-    "FileNode",
-    "VoiceNode",
-    "VideoNode",
-    "AtNode",
-    "ReplyNode",
     # 信息类
     "UserInfo",
     "GroupInfo",

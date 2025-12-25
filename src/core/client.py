@@ -7,12 +7,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Self
 
 if TYPE_CHECKING:
-    from .IM import (
-        Message,
-        User,
-        Group,
-        Me,
-    )
+    from .IM import Message, User, Group, Me
     from ..abc.api_base import APIBase
 
 from ..abc.protocol_abc import ProtocolABC
@@ -79,6 +74,8 @@ class IMClient:
     @classmethod
     def get_current(cls) -> Optional[Self]:
         """获取当前IMClient实例"""
+        if not cls._instance:
+            raise ValueError("IMClient尚未初始化")
         return cls._instance
 
     @classmethod
@@ -131,7 +128,11 @@ class IMClient:
         response = await self.protocol.send_group_message(group_id, msg)
         return self.protocol._parse_message(response)
 
-    async def send_private_message(self, user_id: UserID, msg: "Message") -> "Message":
+    async def send_private_message(
+        self,
+        user_id: UserID,
+        msg: "Message",
+    ) -> "Message":
         """发送私聊消息"""
         response = await self.protocol.send_private_message(user_id, msg)
         return self.protocol._parse_message(response)
