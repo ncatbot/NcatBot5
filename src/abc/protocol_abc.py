@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..utils.typec import GroupID, MsgId, UserID
     from .api_base import APIBase
 
-APIBaseT = TypeVar("APIBaseT", bound=APIBase)
+    APIBaseT = TypeVar("APIBaseT", bound=APIBase)
 
 
 # def unsupported(func: Callable):
