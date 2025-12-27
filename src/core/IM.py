@@ -9,14 +9,16 @@ import json
 from collections.abc import Iterable, Iterator, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
     from .client import IMClient
 
 # ---------------- 前置工具类型 ----------------
-from ..core.nodes import MessageNode
+from ..core.nodes import MessageNode as MessageNode
 from ..utils.typec import GroupID, MsgId, UserID
+
+MessageNodeT = TypeVar("MessageNodeT", bound=MessageNode)
 
 
 # ---------------- 扩展信息（无依赖，放最前） ----------------
@@ -80,18 +82,20 @@ class MessageInfo:
 
 
 # ---------------- 消息链（仅依赖 MessageNode） ----------------
-class MessageChain(Sequence[Union[MessageNode, str]]):
+class MessageChain(Sequence[Union[MessageNodeT, str]]):
     """消息链，可以包含 MessageNode 或原生字符串"""
 
     __slots__ = ("_nodes",)
 
-    def __init__(self, nodes: Iterable[Union[MessageNode, str]] | None = None):
-        self._nodes: tuple[Union[MessageNode, str], ...] = tuple(nodes) if nodes else ()
+    def __init__(self, nodes: Iterable[Union[MessageNodeT, str]] | None = None):
+        self._nodes: tuple[Union[MessageNodeT, str], ...] = (
+            tuple(nodes) if nodes else ()
+        )
 
     # Sequence 接口
     def __getitem__(
         self, index: int | slice
-    ) -> Union[MessageNode, str, "MessageChain"]:
+    ) -> Union[MessageNodeT, str, "MessageChain"]:
         if isinstance(index, slice):
             return MessageChain(self._nodes[index])
         return self._nodes[index]
@@ -99,7 +103,7 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
     def __len__(self) -> int:
         return len(self._nodes)
 
-    def __iter__(self) -> Iterator[Union[MessageNode, str]]:
+    def __iter__(self) -> Iterator[Union[MessageNodeT, str]]:
         return iter(self._nodes)
 
     def __repr__(self) -> str:
@@ -123,7 +127,7 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
         return hash(self._nodes)
 
     def __add__(
-        self, other: Union["MessageChain", Iterable[Union[MessageNode, str]]]
+        self, other: Union["MessageChain", Iterable[Union[MessageNodeT, str]]]
     ) -> "MessageChain":
         if isinstance(other, MessageChain):
             return MessageChain(self._nodes + other._nodes)
@@ -135,7 +139,7 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
         return cls()
 
     @classmethod
-    def of(cls, *nodes: Union[MessageNode, str]) -> "MessageChain":
+    def of(cls, *nodes: Union[MessageNodeT, str]) -> "MessageChain":
         return cls(nodes)
 
     @classmethod
@@ -144,7 +148,7 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
         return cls([text])
 
     @classmethod
-    def from_nodes(cls, nodes: List[MessageNode]) -> "MessageChain":
+    def from_nodes(cls, nodes: List[MessageNodeT]) -> "MessageChain":
         return cls(nodes)
 
     @classmethod
@@ -165,31 +169,31 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
                 nodes_data.append(node.to_dict())
         return json.dumps(nodes_data, ensure_ascii=False)
 
-    def to_list(self) -> List[Union[MessageNode, str]]:
+    def to_list(self) -> List[Union[MessageNodeT, str]]:
         """返回节点列表的深拷贝"""
         result = []
         for node in self._nodes:
-            if isinstance(node, MessageNode):
+            if isinstance(node, MessageNodeT):
                 result.append(deepcopy(node))
             else:
                 # 字符串是不可变的，可以直接使用
                 result.append(node)
         return result
 
-    def to_raw_list(self) -> List[Union[MessageNode, str]]:
+    def to_raw_list(self) -> List[Union[MessageNodeT, str]]:
         """返回原始节点列表（浅拷贝）"""
         return list(self._nodes)
 
     # 查询
     def filter(
-        self, predicate: Callable[[Union[MessageNode, str]], bool]
+        self, predicate: Callable[[Union[MessageNodeT, str]], bool]
     ) -> "MessageChain":
         """过滤节点"""
         return MessageChain(node for node in self._nodes if predicate(node))
 
     def find_first(
-        self, predicate: Callable[[Union[MessageNode, str]], bool]
-    ) -> Union[MessageNode, str, None]:
+        self, predicate: Callable[[Union[MessageNodeT, str]], bool]
+    ) -> Union[MessageNodeT, str, None]:
         """查找第一个满足条件的节点"""
         for node in self._nodes:
             if predicate(node):
@@ -201,10 +205,10 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
         return any(
             isinstance(node, node_type)
             for node in self._nodes
-            if isinstance(node, MessageNode)
+            if isinstance(node, MessageNodeT)
         )
 
-    def get_nodes_by_type(self, node_type: type) -> List[MessageNode]:
+    def get_nodes_by_type(self, node_type: type) -> List[MessageNodeT]:
         """获取指定类型的所有节点（只返回MessageNode）"""
         return [node for node in self._nodes if isinstance(node, node_type)]
 
@@ -212,9 +216,9 @@ class MessageChain(Sequence[Union[MessageNode, str]]):
         """获取所有字符串节点"""
         return [node for node in self._nodes if isinstance(node, str)]
 
-    def get_message_nodes(self) -> List[MessageNode]:
+    def get_message_nodes(self) -> List[MessageNodeT]:
         """获取所有MessageNode节点"""
-        return [node for node in self._nodes if isinstance(node, MessageNode)]
+        return [node for node in self._nodes if isinstance(node, MessageNodeT)]
 
 
 # ---------------- 引用 / 转发信息（仅依赖 MsgId, UserID） ----------------
@@ -412,13 +416,13 @@ class Message:
         return self._message_type == self.SYSTEM
 
     # 代理到 content
-    def __getitem__(self, index: int | slice) -> Union[MessageNode, str, MessageChain]:
+    def __getitem__(self, index: int | slice) -> Union[MessageNodeT, str, MessageChain]:
         return self._content[index]
 
     def __len__(self) -> int:
         return len(self._content)
 
-    def __iter__(self) -> Iterator[Union[MessageNode, str]]:
+    def __iter__(self) -> Iterator[Union[MessageNodeT, str]]:
         return iter(self._content)
 
     def __contains__(self, item: Any) -> bool:
@@ -801,6 +805,12 @@ class Group:
     def avatar_url(self) -> Optional[str]:
         return self._avatar_url
 
+    async def is_admin(self, user_id: UserID) -> bool:
+        return user_id in self.info.admin_ids
+
+    async def is_owner(self, user_id: UserID) -> bool:
+        return user_id == self.info.owner_id
+
     async def get_info(self) -> Dict[str, Any]:
         return await self._client.get_group_info(self._gid)
 
@@ -914,6 +924,10 @@ class Group:
     @property
     def owner_id(self) -> Optional[UserID]:
         return self.info.owner_id
+
+    @property
+    def admin_ids(self) -> Optional[UserID]:
+        return self.info.admin_ids
 
 
 class Me(User):
@@ -1087,7 +1101,7 @@ class MessageChainBuilder:
         self._nodes.append(text)
         return self
 
-    def node(self, node: MessageNode) -> "MessageChainBuilder":
+    def node(self, node: MessageNodeT) -> "MessageChainBuilder":
         self._nodes.append(node)
         return self
 

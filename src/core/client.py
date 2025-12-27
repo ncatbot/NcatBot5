@@ -4,11 +4,13 @@ IM客户端
 """
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Self
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Self, TypeVar
 
 if TYPE_CHECKING:
-    from .IM import Message, User, Group, Me
-    from ..abc.api_base import APIBase
+    from ..abc.api_base import APIBase as APIBase
+    from .IM import Group, Me, Message, User
+
+    APIBaseT = TypeVar("APIBaseT", bound=APIBase)
 
 from ..abc.protocol_abc import ProtocolABC
 from ..utils.typec import GroupID, MsgId, UserID
@@ -113,7 +115,7 @@ class IMClient:
         return self._me is not None
 
     @property
-    def api(self) -> "APIBase":
+    def api(self) -> "APIBaseT":
         """获取底层API（供高级用户直接使用）"""
         return self.protocol.api
 

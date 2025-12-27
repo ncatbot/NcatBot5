@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod
 from ast import Tuple
-from typing import TYPE_CHECKING, Any, Dict, List, NewType, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, NewType, Optional, TypeVar
 
 from ..plugins_system.core.events import Event
 
@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from ..core.IM import Group, Message, User
     from ..utils.typec import GroupID, MsgId, UserID
     from .api_base import APIBase
+
+APIBaseT = TypeVar("APIBaseT", bound=APIBase)
 
 
 # def unsupported(func: Callable):
@@ -88,7 +90,7 @@ class ProtocolABC(ABC, metaclass=ProtocolMeta):
 
     @property
     @abstractmethod
-    def api(self) -> "APIBase":
+    def api(self) -> "APIBaseT":
         """获取所属的APIBase实例"""
 
     @property
