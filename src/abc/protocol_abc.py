@@ -90,7 +90,7 @@ class ProtocolABC(ABC, metaclass=ProtocolMeta):
 
     @property
     @abstractmethod
-    def api(self) -> "APIBaseT":
+    def api(self) -> Optional["APIBaseT"]:
         """获取所属的APIBase实例"""
 
     @property

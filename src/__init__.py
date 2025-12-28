@@ -5,7 +5,10 @@ from .core.client import IMClient
 from .core.IM import Group, Me, Message, MessageBuilder, User
 from .core.nodes import MessageNode
 from .core.plugin import PluginBase
+from .utils.logger import setup_logging
 from .utils.typec import MessageStatus, MessageType, Role, Sex
+
+setup_logging()
 
 __all__ = [
     # 核心类

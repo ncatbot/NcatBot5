@@ -302,7 +302,7 @@ def setup_logging(console_level=None):
 
 
 # 初始化日志配置
-setup_logging()
+# setup_logging()
 
 
 def get_log(name="Logger"):
@@ -319,6 +319,7 @@ def get_log(name="Logger"):
 
 # 示例用法
 if __name__ == "__main__":
+    setup_logging()
     # 获取不同记录器的日志
     root_logger = logging.getLogger()
     db_logger = logging.getLogger("database")
