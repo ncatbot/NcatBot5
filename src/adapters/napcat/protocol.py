@@ -9,6 +9,7 @@ from ...core.IM import Group, Message, MessageChain, MessageNodeT, User
 from ...plugins_system.core.events import Event
 from ...utils.typec import GroupID, MsgId, UserID
 from .api import NCAPI
+from .builder import MessageBuilder
 
 logger = logging.getLogger("Protocol.Napcat")
 
@@ -17,6 +18,7 @@ class NapcatProtocol(ProtocolABC):
     """napcat 协议实现"""
 
     protocol_name = "napcat"
+    msg_builder = MessageBuilder
 
     def __init__(self):
         self._api = NCAPI()

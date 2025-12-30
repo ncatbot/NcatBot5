@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, TypeVar
 
-from ....core.nodes import MessageNode
+from ....abc.nodes import MessageNode
 
 if TYPE_CHECKING:
     from .dto.dto_base import BaseDto

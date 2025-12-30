@@ -1,9 +1,9 @@
 from .__main__ import Bot
 from .abc.api_base import APIBase
+from .abc.nodes import MessageNode
 from .adapters import protocols  # 加载协议
 from .core.client import IMClient
-from .core.IM import Group, Me, Message, MessageBuilder, User
-from .core.nodes import MessageNode
+from .core.IM import Group, Me, Message, User
 from .core.plugin import PluginBase
 from .utils.logger import setup_logging
 from .utils.typec import MessageStatus, MessageType, Role, Sex
@@ -24,7 +24,6 @@ __all__ = [
     "Role",
     # 消息相关
     "MessageContent",
-    "MessageBuilder",
     "MessageNode",
     # 信息类
     "UserInfo",

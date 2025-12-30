@@ -2,19 +2,10 @@
 协议实现
 """
 from ..abc.api_base import APIBase
+from ..abc.nodes import MessageNode
 
 # 重新导出核心类型，方便协议导入
-from ..core.IM import (
-    Group,
-    GroupInfo,
-    Me,
-    Message,
-    MessageBuilder,
-    MessageInfo,
-    User,
-    UserInfo,
-)
-from ..core.nodes import MessageNode
+from ..core.IM import Group, GroupInfo, Me, Message, MessageInfo, User, UserInfo
 from ..utils.typec import MessageStatus, MessageType, Role, Sex
 
 protocols = ("napcat",)
@@ -42,7 +33,6 @@ __all__ = [
     "Sex",
     "Role",
     # 消息相关
-    "MessageBuilder",
     "MessageNode",
     # 信息类
     "UserInfo",

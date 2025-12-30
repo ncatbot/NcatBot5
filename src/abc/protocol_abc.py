@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     from ..core.IM import Group, Message, User
     from ..utils.typec import GroupID, MsgId, UserID
     from .api_base import APIBase
+    from .builder import MessageBuilder
 
+    APIBaseT = TypeVar("APIBaseT", bound=APIBase)
     APIBaseT = TypeVar("APIBaseT", bound=APIBase)
 
 
@@ -79,9 +81,6 @@ class ProtocolABC(Generic[APIBaseT], ABC, metaclass=ProtocolMeta):
     这些接口与具体协议无关，是通用抽象
     """
 
-    # 协议名称，子类必须定义
-    protocol_name: str
-
     def __init__(self):
         """初始化协议
         Args:
@@ -93,8 +92,18 @@ class ProtocolABC(Generic[APIBaseT], ABC, metaclass=ProtocolMeta):
 
     @property
     @abstractmethod
+    def protocol_name(self) -> Optional[APIBaseT]:
+        """协议名称"""
+
+    @property
+    @abstractmethod
     def api(self) -> Optional[APIBaseT]:
         """获取所属的APIBase实例"""
+
+    @property
+    @abstractmethod
+    def msg_builder(self) -> MessageBuilder:
+        """获取所属的消息构造器"""
 
     @property
     @abstractmethod

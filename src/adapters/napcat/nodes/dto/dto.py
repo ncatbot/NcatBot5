@@ -1,6 +1,7 @@
 from typing import List, Literal, Optional
 
-from .....utils.dto_tool import dataclass_dto
+from src.utils.dto_tool import dataclass_dto
+
 from .dto_base import BaseDto
 
 # ==================== 基础消息DTO ====================

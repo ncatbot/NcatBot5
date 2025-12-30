@@ -52,7 +52,7 @@ class Bot:
             plugin_dirs=plugin_dirs,
             config_dir=config_dir,
             data_dir=data_dir,
-            dev_mode=DefaultSetting.debug,  # TODO 热重载
+            dev_mode=DefaultSetting.debug,  # NOTE 热重载
             event_bus=DefaultSetting.event_bus,
         )
         self.event_bus: EventBus = self.plugin_sys.event_bus
