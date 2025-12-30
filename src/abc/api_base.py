@@ -6,12 +6,12 @@ import asyncio
 import functools
 import inspect
 from abc import ABC, ABCMeta, abstractmethod
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generic, List, Optional, TypeVar
+
+T = TypeVar("T")
 
 
-@dataclass
-class ApiRequest:
+class ApiRequest(Generic[T]):
     """API请求定义"""
 
     activity: str  # 操作名称
@@ -86,7 +86,7 @@ class APIBase(ABC, metaclass=ApiMeta):
 
     # ========== 底层方法 ==========
     @abstractmethod
-    async def invoke(self, request: ApiRequest) -> Any:
+    async def invoke(self, request: ApiRequest[Any]) -> Any:
         """
         执行API调用 - 子类必须实现
         这是唯一的强制要求
@@ -118,9 +118,9 @@ class APIBase(ABC, metaclass=ApiMeta):
         async def dynamic_method(*args, **kwargs):
             if args:  # 只要出现位置参数就报错
                 raise TypeError(
-                    f"{name} 仅接受关键字参数，请使用 key=value 形式调用，" "避免桥接 API 时参数顺序与远端不一致"
+                    f"{name} 仅接受关键字参数，请使用 key=value 形式调用，避免桥接 API 时参数顺序与远端不一致"
                 )
             # 纯关键字参数
-            return await self.invoke(ApiRequest(name, kwargs))
+            return await self.invoke(ApiRequest[Any](name, kwargs))
 
         return dynamic_method

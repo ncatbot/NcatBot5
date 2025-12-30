@@ -6,10 +6,22 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Self,
+    Type,
+    TypeVar,
+    Union,
+)
 
 if TYPE_CHECKING:
     from .client import IMClient
@@ -95,7 +107,7 @@ class MessageChain(Sequence[Union[MessageNodeT, str]]):
     # Sequence 接口
     def __getitem__(
         self, index: int | slice
-    ) -> Union[MessageNodeT, str, "MessageChain"]:
+    ) -> Union[MessageNodeT, str, "MessageChain[MessageNodeT]"]:
         if isinstance(index, slice):
             return MessageChain(self._nodes[index])
         return self._nodes[index]
@@ -127,32 +139,33 @@ class MessageChain(Sequence[Union[MessageNodeT, str]]):
         return hash(self._nodes)
 
     def __add__(
-        self, other: Union["MessageChain", Iterable[Union[MessageNodeT, str]]]
-    ) -> "MessageChain":
+        self,
+        other: Union["MessageChain[MessageNodeT]", Iterable[Union[MessageNodeT, str]]],
+    ) -> "MessageChain[MessageNodeT]":
         if isinstance(other, MessageChain):
             return MessageChain(self._nodes + other._nodes)
         return MessageChain(list(self._nodes) + list(other))
 
     # 工厂
     @classmethod
-    def empty(cls) -> "MessageChain":
+    def empty(cls: Type[Self]) -> Self:
         return cls()
 
     @classmethod
-    def of(cls, *nodes: Union[MessageNodeT, str]) -> "MessageChain":
+    def of(cls: Type[Self], *nodes: Union[MessageNodeT, str]) -> Self:
         return cls(nodes)
 
     @classmethod
-    def from_text(cls, text: str) -> "MessageChain":
+    def from_text(cls: Type[Self], text: str) -> Self:
         # 直接使用字符串，不转换为TextNode
         return cls([text])
 
     @classmethod
-    def from_nodes(cls, nodes: List[MessageNodeT]) -> "MessageChain":
+    def from_nodes(cls: Type[Self], nodes: List[MessageNodeT]) -> Self:
         return cls(nodes)
 
     @classmethod
-    def from_strings(cls, *strings: str) -> "MessageChain":
+    def from_strings(cls: Type[Self], *strings: str) -> Self:
         """从多个字符串创建消息链"""
         return cls(strings)
 
@@ -171,12 +184,11 @@ class MessageChain(Sequence[Union[MessageNodeT, str]]):
 
     def to_list(self) -> List[Union[MessageNodeT, str]]:
         """返回节点列表的深拷贝"""
-        result = []
+        result: List[Union[MessageNodeT, str]] = []
         for node in self._nodes:
-            if isinstance(node, MessageNodeT):
+            if hasattr(node, "__deepcopy__"):
                 result.append(deepcopy(node))
             else:
-                # 字符串是不可变的，可以直接使用
                 result.append(node)
         return result
 
@@ -208,7 +220,7 @@ class MessageChain(Sequence[Union[MessageNodeT, str]]):
             if isinstance(node, MessageNodeT)
         )
 
-    def get_nodes_by_type(self, node_type: type) -> List[MessageNodeT]:
+    def get_nodes_by_type(self, node_type: Type[MessageNodeT]) -> List[MessageNodeT]:
         """获取指定类型的所有节点（只返回MessageNode）"""
         return [node for node in self._nodes if isinstance(node, node_type)]
 
@@ -218,7 +230,7 @@ class MessageChain(Sequence[Union[MessageNodeT, str]]):
 
     def get_message_nodes(self) -> List[MessageNodeT]:
         """获取所有MessageNode节点"""
-        return [node for node in self._nodes if isinstance(node, MessageNodeT)]
+        return [node for node in self._nodes if isinstance(node, MessageNode)]
 
 
 # ---------------- 引用 / 转发信息（仅依赖 MsgId, UserID） ----------------
@@ -973,11 +985,35 @@ class Me(User):
         return await self._client.update_self_profile(kwargs)
 
 
-# ---------------- 消息构建器（最后，依赖以上全部） ----------------
-class MessageBuilder:
-    """消息构建器，用于构建用于发送的消息"""
+# ---------------- Builder基类（可扩展的基础） ----------------
+class MessageChainBuilderMixin(ABC):
+    """消息链构建器混入类，用于扩展构建方法"""
 
     def __init__(self) -> None:
+        super().__init__()  # 如果混入类有父类
+        self._nodes = []
+
+    def text(self, text: str) -> "Self":
+        """添加文本节点"""
+        self._nodes.append(text)
+        return self
+
+    def node(self, node: MessageNodeT) -> "Self":
+        """添加任意消息节点"""
+        self._nodes.append(node)
+        return self
+
+    @abstractmethod
+    def build(self) -> MessageChain:
+        """构建消息链"""
+        pass
+
+
+class MessageBuilderMixin(ABC):
+    """消息构建器混入类，用于扩展构建方法"""
+
+    def __init__(self) -> None:
+        super().__init__()
         self._msg_id: Optional[MsgId] = None
         self._sender_id: Optional[UserID] = None
         self._content: Optional[MessageChain] = None
@@ -987,55 +1023,55 @@ class MessageBuilder:
         self._reference: Optional[MessageReference] = None
         self._forward_info: Optional[ForwardInfo] = None
 
-    def id(self, msg_id: MsgId) -> "MessageBuilder":
+    def id(self, msg_id: MsgId) -> "Self":
         self._msg_id = msg_id
         return self
 
-    def sender(self, sender_id: UserID) -> "MessageBuilder":
+    def sender(self, sender_id: UserID) -> "Self":
         self._sender_id = sender_id
         return self
 
-    def content(self, content: MessageChain) -> "MessageBuilder":
+    def content(self, content: MessageChain) -> "Self":
         self._content = content
         return self
 
-    def text(self, text: str) -> "MessageBuilder":
+    def text(self, text: str) -> "Self":
         self._content = MessageChain.from_text(text)
         return self
 
-    def timestamp(self, ts: dt.datetime) -> "MessageBuilder":
+    def timestamp(self, ts: dt.datetime) -> "Self":
         self._timestamp = ts
         return self
 
-    def now(self) -> "MessageBuilder":
+    def now(self) -> "Self":
         self._timestamp = dt.datetime.now()
         return self
 
-    def type(self, tp: str) -> "MessageBuilder":
+    def type(self, tp: str) -> "Self":
         self._msg_type = tp
         return self
 
-    def group(self, gid: GroupID) -> "MessageBuilder":
+    def group(self, gid: GroupID) -> "Self":
         self._group_id = gid
         return self
 
-    def private(self) -> "MessageBuilder":
+    def private(self) -> "Self":
         self._group_id = None
         return self
 
     def reply_to(
         self,
         msg_id: MsgId,
-        sender_id: UserID,
-        ts: dt.datetime,
+        sender_id: UserID = None,
+        timestamp=dt.datetime.now(),
         preview: Optional[str] = None,
-    ) -> "MessageBuilder":
+    ) -> "Self":
         self._msg_type = Message.REPLY
         self._reference = MessageReference(
             message_id=msg_id,
             sender_id=sender_id,
             preview=preview or "",
-            timestamp=ts,
+            timestamp=timestamp,
         )
         return self
 
@@ -1046,7 +1082,7 @@ class MessageBuilder:
         orig_ts: dt.datetime,
         orig_content: MessageChain,
         forwarder: UserID,
-    ) -> "MessageBuilder":
+    ) -> "Self":
         self._msg_type = Message.FORWARD
         self._forward_info = ForwardInfo(
             original_message_id=msg_id,
@@ -1056,6 +1092,23 @@ class MessageBuilder:
             forwarder_id=forwarder,
         )
         return self
+
+    @abstractmethod
+    def build(self) -> Message:
+        """构建消息"""
+        pass
+
+
+# ---------------- 基础Builder实现 ----------------
+class BaseMessageChainBuilder(MessageChainBuilderMixin):
+    """基础消息链构建器"""
+
+    def build(self) -> MessageChain:
+        return MessageChain(self._nodes)
+
+
+class BaseMessageBuilder(MessageBuilderMixin):
+    """基础消息构建器"""
 
     def build(self) -> Message:
         """构建消息（用于发送）"""
@@ -1076,9 +1129,6 @@ class MessageBuilder:
         if self._content is None:
             self._content = MessageChain.empty()
 
-        # 发送消息时不需要id，由服务器生成
-        # 只保留id设置，如果用户明确设置了id（如用于构建接收到的消息）
-
         return Message(
             msg_id=self._msg_id,  # 可以为None
             sender_id=self._sender_id,
@@ -1091,19 +1141,35 @@ class MessageBuilder:
         )
 
 
-class MessageChainBuilder:
-    """流畅接口构建消息链"""
+# ---------------- 协议扩展示例 ----------------
+# 协议开发者可以这样扩展：
+"""
+# 在协议模块中
+from ..entities import MessageChainBuilderMixin, MessageBuilderMixin, BuilderFactory
+from .nodes import ImageNode, VoiceNode  # 协议特定的节点
 
-    def __init__(self):
-        self._nodes = []
-
-    def text(self, text: str) -> "MessageChainBuilder":
-        self._nodes.append(text)
+class QQMessageChainBuilder(MessageChainBuilderMixin):
+    def image(self, url: str, width: int = None, height: int = None) -> Self:
+        node = ImageNode(url=url, width=width, height=height)
+        self._nodes.append(node)
         return self
 
-    def node(self, node: MessageNodeT) -> "MessageChainBuilder":
+    def voice(self, url: str, duration: int) -> Self:
+        node = VoiceNode(url=url, duration=duration)
         self._nodes.append(node)
         return self
 
     def build(self) -> MessageChain:
         return MessageChain(self._nodes)
+
+class QQMessageBuilder(MessageBuilderMixin):
+    def image(self, url: str) -> Self:
+        chain_builder = BuilderFactory.create_message_chain_builder()
+        self._content = chain_builder.image(url).build()
+        return self
+
+    def build(self) -> Message:
+        # 自定义构建逻辑
+        return super().build()
+
+"""

@@ -4,7 +4,7 @@ IM客户端
 """
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Self, TypeVar
 
 if TYPE_CHECKING:
     from ..abc.api_base import APIBase as APIBase
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     APIBaseT = TypeVar("APIBaseT", bound=APIBase)
 
-from ..abc.protocol_abc import ProtocolABC
+from ..abc.protocol_abc import APIBaseT, ProtocolABC
 from ..utils.typec import GroupID, MsgId, UserID
 
 log = logging.getLogger("IMClient")
@@ -38,7 +38,7 @@ log = logging.getLogger("IMClient")
 #     return wrapper
 
 
-class IMClient:
+class IMClient(Generic[APIBaseT]):
     """
     IM客户端单例
     每个进程只能有一个实例
@@ -57,7 +57,7 @@ class IMClient:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, protocol: ProtocolABC):
+    def __init__(self, protocol: ProtocolABC[APIBaseT]):
         # 防止重复初始化
         if self._initialized:
             return
@@ -86,7 +86,7 @@ class IMClient:
         return cls._initialized
 
     @property
-    def protocol(self) -> "ProtocolABC":
+    def protocol(self) -> ProtocolABC[APIBaseT]:
         """获取当前协议实例"""
         if not self._initialized:
             raise RuntimeError("IMClient未初始化")
@@ -115,7 +115,7 @@ class IMClient:
         return self._me is not None
 
     @property
-    def api(self) -> "APIBaseT":
+    def api(self) -> APIBaseT:
         """获取底层API（供高级用户直接使用）"""
         return self.protocol.api
 

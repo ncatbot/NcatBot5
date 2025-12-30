@@ -28,7 +28,7 @@ class MessageNode(ABC):
 
     @property
     @abstractmethod
-    def type(self) -> str:
+    def node_type(self) -> str:
         """节点类型标识符（如：text, image, audio等）"""
         pass
 

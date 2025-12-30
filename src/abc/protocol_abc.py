@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod
 from ast import Tuple
-from typing import TYPE_CHECKING, Any, Dict, List, NewType, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, NewType, Optional, TypeVar
 
 from ..plugins_system.core.events import Event
 
@@ -69,7 +69,10 @@ class ProtocolMeta(ABCMeta):
         return list(cls._protocols.keys())
 
 
-class ProtocolABC(ABC, metaclass=ProtocolMeta):
+APIBaseT = TypeVar("APIBaseT", bound="APIBase")
+
+
+class ProtocolABC(Generic[APIBaseT], ABC, metaclass=ProtocolMeta):
     """
     最小抽象层基类
     定义固定的接口签名，所有协议必须实现
@@ -90,7 +93,7 @@ class ProtocolABC(ABC, metaclass=ProtocolMeta):
 
     @property
     @abstractmethod
-    def api(self) -> Optional["APIBaseT"]:
+    def api(self) -> Optional[APIBaseT]:
         """获取所属的APIBase实例"""
 
     @property

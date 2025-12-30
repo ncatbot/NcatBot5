@@ -1,4 +1,4 @@
-from ...connector import AsyncWebSocketClient
+from ....connector import AsyncWebSocketClient
 from .api_base import NCAPIBase
 from .group import NCAPIGroup
 from .message import NCAPIMessage

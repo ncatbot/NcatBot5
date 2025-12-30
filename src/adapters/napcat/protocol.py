@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from ...abc.protocol_abc import ProtocolABC, RawGroup, RawMessage, RawUser
 from ...connector import AsyncWebSocketClient, MessageType
-from ...core.IM import Group, Message, MessageContent, User
+from ...core.IM import Group, Message, MessageChain, MessageNodeT, User
 from ...plugins_system.core.events import Event
 from ...utils.typec import GroupID, MsgId, UserID
 from .api import NCAPI
@@ -34,11 +34,9 @@ class NapcatProtocol(ProtocolABC):
 
     # ========== 核心消息发送 ==========
 
-    async def send_group_message(
-        self, gid: GroupID, content: MessageContent
-    ) -> RawMessage:
+    async def send_group_message(self, gid: GroupID, content: Message) -> RawMessage:
         """发送群消息"""
-        # 将 MessageContent 转换为 napcat 的消息格式
+        # 将 Message 转换为 napcat 的消息格式
         message_segments = self._content_to_segments(content)
 
         # 调用 API 发送
@@ -48,11 +46,9 @@ class NapcatProtocol(ProtocolABC):
 
         return response
 
-    async def send_private_message(
-        self, uid: UserID, content: MessageContent
-    ) -> RawMessage:
+    async def send_private_message(self, uid: UserID, content: Message) -> RawMessage:
         """发送私聊消息"""
-        # 将 MessageContent 转换为 napcat 的消息格式
+        # 将 Message 转换为 napcat 的消息格式
         message_segments = self._content_to_segments(content)
 
         # 调用 API 发送
@@ -141,10 +137,10 @@ class NapcatProtocol(ProtocolABC):
         """解析消息"""
 
         # 解析消息内容
-        content = self._parse_message_content(raw.get("content", []))
+        content = self._parse_message_content(raw.get("message", []))
 
         # 解析时间戳
-        timestamp = raw.get("timestamp")
+        timestamp = raw.get("time")
         if timestamp:
             try:
                 timestamp = dt.datetime.fromisoformat(timestamp)
@@ -159,7 +155,6 @@ class NapcatProtocol(ProtocolABC):
             content=content,
             timestamp=timestamp,
             group_id=GroupID(str(raw.get("group_id"))),
-            reply_to=None,  # napcat 的 reply 信息需要从 content 中提取
         )
 
     def _parse_user(self, raw: Dict[str, Any]) -> User:
@@ -192,38 +187,39 @@ class NapcatProtocol(ProtocolABC):
 
         # 解析 JSON 数据
         try:
-            data = json.loads(raw[0])
+            raw_dict: dict = json.loads(raw[0])
+            logger.info(f"接收到原始数据: {raw_dict}")
         except json.JSONDecodeError as e:
             logger.error(f"JSON 解析失败: {e}")
             return None
 
-        logger.debug("[NAPCAT] %s", data)
+        logger.debug("[NAPCAT] %s", raw_dict)
 
         # 跳过API响应（有echo字段的是响应，没有post_type的也跳过）
-        if "echo" in data or "post_type" not in data:
+        if "echo" in raw_dict or "post_type" not in raw_dict:
             return None
 
-        post_type = data.get("post_type")
+        post_type = raw_dict.get("post_type")
 
         match post_type:
             case "message":  # message.group / message.private
-                event_name = f"message.{data['message_type']}"
+                event_name = f"message.{raw_dict['message_type']}"
 
             case "notice":
-                event_name = f"notice.{data['notice_type']}"
+                event_name = f"notice.{raw_dict['notice_type']}"
 
             case "request":
-                event_name = f"request.{data['request_type']}"
+                event_name = f"request.{raw_dict['request_type']}"
 
             case "meta_event":
-                meta_event_type = data["meta_event_type"]
+                meta_event_type = raw_dict["meta_event_type"]
                 event_name = f"meta.{meta_event_type}"
 
                 match meta_event_type:
                     case "connect":
                         if hasattr(self, "_self_id") and self._self_id:
                             logger.warning("重复连接事件，BotID 已存在: %s", self._self_id)
-                        self._self_id = str(data["self_id"])
+                        self._self_id = str(raw_dict["self_id"])
                         logger.info("协议对接成功 BotID: %s", self._self_id)
 
                     case _:
@@ -233,63 +229,58 @@ class NapcatProtocol(ProtocolABC):
                 event_name = None
                 logger.warning("未知事件: %s", post_type)
 
+        # 解析消息内容（仅对 message 类型）
+        if post_type == "message":
+            data = self._parse_message(raw=raw_dict)
+            logger.info(f"解析后的消息数据: {data}")
+        else:
+            data = raw_dict
+
         # 创建事件对象
         return Event(
             event=event_name or post_type,
             data=data,
             source="napcat",
-            metadata={"post_type": post_type, "raw_event": data},
+            metadata={"post_type": post_type, "raw_event": raw_dict},
         )
 
     # ========== 辅助方法 ==========
 
-    def _content_to_segments(self, content: MessageContent) -> List[dict]:
-        """将 MessageContent 转换为 napcat 消息段"""
-        from ...core.nodes import AtNode, FileNode, ImageNode, ReplyNode, TextNode
+    def _content_to_segments(self, content: Message) -> List[dict]:
+        """将 Message 转换为 napcat 消息段"""
+        from .nodes.node_base import BaseNode
 
         segments = []
+        nodes: list[MessageNodeT] = content.content.get_message_nodes()
 
-        for node in content.nodes:
-            if isinstance(node, TextNode):
-                segments.append({"type": "text", "data": {"text": node.content}})
-
-            elif isinstance(node, ImageNode):
-                segments.append({"type": "image", "data": {"file": node.uri}})
-
-            elif isinstance(node, AtNode):
-                segments.append({"type": "at", "data": {"qq": node.user_id}})
-
-            elif isinstance(node, ReplyNode):
-                segments.append({"type": "reply", "data": {"id": node.message_id}})
-
-            elif isinstance(node, FileNode):
-                segments.append(
-                    {"type": "file", "data": {"file": node.uri, "name": node.name}}
-                )
-
-            # 其他节点类型可以继续扩展
+        for node in nodes:
+            if isinstance(node, BaseNode):
+                # 所有BaseNode子类都支持to_dict，返回符合OneBot协议的格式
+                segments.append(node.to_dict())
+            elif isinstance(node, str):
+                # 字符串直接转为text节点
+                segments.append({"type": "text", "data": {"text": node}})
 
         return segments
 
-    def _parse_message_content(self, segments: List[dict]) -> MessageContent:
-        """解析 napcat 消息段为 MessageContent"""
-        from ...core.nodes import ImageNode, TextNode
+    def _parse_message_content(self, segments: List[dict]) -> MessageChain:
+        """解析 napcat 消息段为 Message"""
+        from .nodes import Text
+        from .nodes.dto import TextDTO
 
         nodes = []
 
         for seg in segments:
             seg_type = seg.get("type")
-            data = seg.get("data", {})
+            data: dict = seg.get("data", {})
 
             if seg_type == "text":
-                nodes.append(TextNode(content=data.get("text", "")))
-
-            elif seg_type == "image":
-                nodes.append(ImageNode(uri=data.get("url")))
+                text_dto: TextDTO = TextDTO.from_dict(data)
+                nodes.append(Text.from_dto(text_dto))
 
             # 其他类型继续扩展
 
-        return MessageContent(nodes=nodes)
+        return MessageChain(nodes=nodes)
 
     # ========== 好友管理 ==========
 
