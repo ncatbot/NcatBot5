@@ -18,3 +18,17 @@ __maintainer_email__ = "Fish.zh@outlook.com"
 __summary__ = "一个基于通信协议的 Python Bot SDK"
 
 __min_python_version__ = "3.10"
+
+__all__ = [
+    "__version__",
+    "__plugin_sys_version__",
+    "__status__",
+    "__author__",
+    "__author_email__",
+    "__license__",
+    "__copyright__",
+    "__maintainer__",
+    "__maintainer_email__",
+    "__summary__",
+    "__min_python_version__",
+]

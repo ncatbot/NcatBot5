@@ -19,7 +19,7 @@ jobs:
       - name: 提取新版本号
         id: version
         run: |
-          VERSION=$(grep -P '__version__\s*=' my_package/__version__.py | cut -d\" -f2)
+          VERSION=$(python3 -c "import src;print(src.meta.__version__)")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: 创建并推送 tag

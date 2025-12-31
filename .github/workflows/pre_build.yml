@@ -45,8 +45,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pre-commit build twine
 
-      # 6. 运行 ci.py：pytest + pre-commit + hatch pre-build（dry-run）
-      - name: 运行 CI 入口（测试 & 预构建干跑）
-        env:
-          HC_DRY_RUN: "1"   # 告诉 hatch 只做检查
-        run: python -m cat.cil test
+      # 6. 运行 pre-commit
+      - name: 运行 pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      # 7. 运行 pytest
+      - name: 运行 pytest
+        run: pytest -q
