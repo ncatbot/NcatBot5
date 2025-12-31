@@ -1,10 +1,9 @@
 name: 构建并发布至 PyPI
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["预构建检查"]
+    types: [ completed ]
   workflow_dispatch:
 
 jobs:
@@ -46,8 +45,8 @@ jobs:
 
   publish:
     needs: build
-    # 只有推送到 main 才真正发布
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # 只在预构建检查成功且为 main 分支时才发布，或允许手动触发
+    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       # 1. 下载构建产物（无需再次检出）
