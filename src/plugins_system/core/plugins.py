@@ -380,15 +380,9 @@ class Plugin(ABC, metaclass=PluginMeta):
         """获取插件配置目录"""
         return self.context.get_config_dir()
 
-    def get_config_file_path(self, filename: Optional[str] = None) -> Optional[Path]:
+    def get_config_file_path(self, filename: str) -> Path:
         """获取配置文件路径"""
         config_dir = self.context.get_config_dir()
-        if config_dir is None:
-            return None
-
-        if filename is None:
-            return config_dir
-
         return config_dir / filename
 
     def get_data_file_path(self, filename: str) -> Path:

@@ -1,39 +1,32 @@
 """
 协议实现
 """
+import importlib
+
 from ..abc.api_base import APIBase
+from ..abc.builder import MessageBuilder
 from ..abc.nodes import MessageNode
+from ..core.client import IMClient
 
 # 重新导出核心类型，方便协议导入
 from ..core.IM import Group, GroupInfo, Me, Message, MessageInfo, User, UserInfo
-from ..utils.typec import MessageStatus, MessageType, Role, Sex
 
 protocols = ("napcat",)
-
-import importlib  # noqa: E402
 
 for p in protocols:
     importlib.import_module(f".{p}", package=__package__)
 
 
 __all__ = [
-    # 工厂函数
-    "create_client",
-    "register_protocol",
-    "get_available_protocols",
     # 核心类
     "IMClient",
     "User",
     "Group",
     "Me",
     "Message",
-    # 枚举类型
-    "MessageType",
-    "MessageStatus",
-    "Sex",
-    "Role",
     # 消息相关
     "MessageNode",
+    "MessageBuilder",
     # 信息类
     "UserInfo",
     "GroupInfo",

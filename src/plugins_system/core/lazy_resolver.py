@@ -16,6 +16,7 @@ from typing import (
     Set,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 
@@ -46,8 +47,8 @@ class LazyDecoratorResolver(ABC, metaclass=_LazyResolverMeta):
     """
 
     _lock: ClassVar[threading.Lock] = threading.Lock()
-    _resolved: ClassVar[List["LazyDecoratorResolver"]] = []
-    _resolvers: ClassVar[List[Type["LazyDecoratorResolver"]]] = []
+    _resolved: ClassVar[List[TypeVar["LazyDecoratorResolver"]]] = []
+    _resolvers: ClassVar[List[TypeVar["LazyDecoratorResolver"]]] = []
 
     # 子类可以覆盖这些类变量
     tag: ClassVar[Union[str, Set[str]]] = None  # 装饰器标签
@@ -60,7 +61,7 @@ class LazyDecoratorResolver(ABC, metaclass=_LazyResolverMeta):
         self._current_kwd: Optional[Dict[str, Any]] = None
 
     @classmethod
-    def get_all_resolvers(cls) -> List["LazyDecoratorResolver"]:
+    def get_all_resolvers(cls) -> List[TypeVar["LazyDecoratorResolver"]]:
         """获取所有注册的解析器实例"""
         with cls._lock:
             if not cls._resolved:
@@ -71,6 +72,7 @@ class LazyDecoratorResolver(ABC, metaclass=_LazyResolverMeta):
         """
         默认的检查方法 - 支持隐式命名空间检查
         """
+        # NOTE 不要操作数据，这会导致检查副作用
         # 获取原始函数（处理绑定方法）
         original_func = func
         if hasattr(func, "__func__"):
@@ -152,11 +154,6 @@ class LazyDecoratorResolver(ABC, metaclass=_LazyResolverMeta):
 
         return mate_data.get(self.space, {}) if self.space else mate_data
 
-    @abstractmethod
-    def handle(self, plugin: Plugin, func: Callable, event_bus: EventBus) -> None:
-        """执行延迟绑定逻辑"""
-        pass
-
     @staticmethod
     def has_all_attrs(data: Dict[str, Any], *specs: Tuple[str, Type]) -> bool:
         """增强的属性检查工具"""
@@ -170,6 +167,10 @@ class LazyDecoratorResolver(ABC, metaclass=_LazyResolverMeta):
         """清理当前缓存"""
         self._current_func = None
         self._current_kwd = None
+
+    @abstractmethod
+    def handle(self, plugin: Plugin, func: Callable, event_bus: EventBus) -> None:
+        """执行延迟绑定逻辑"""
 
 
 # -------------------- 基础设施 --------------------
@@ -207,7 +208,6 @@ def tagged_decorator(
 def create_namespaced_decorator(
     tag: str,
     space: str,
-    resolver_class: Type[LazyDecoratorResolver],
     **default_meta: Any,
 ) -> Callable[..., Callable]:
     """

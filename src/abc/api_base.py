@@ -6,11 +6,13 @@ import asyncio
 import functools
 import inspect
 from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 T = TypeVar("T")
 
 
+@dataclass
 class ApiRequest(Generic[T]):
     """API请求定义"""
 
@@ -26,7 +28,7 @@ class ApiMeta(ABCMeta):
         cls = super().__new__(mcs, name, bases, namespace)
 
         # 跳过抽象基类
-        if namespace.get("__abstractmethods__"):
+        if cls.__abstractmethods__:  # 非空即真
             return cls
 
         assert isinstance(namespace, dict)

@@ -138,6 +138,12 @@ class NapcatProtocol(ProtocolABC):
     def _parse_message(self, raw: Dict[str, Any]) -> Message:
         """解析消息"""
 
+        if raw.get("retcode") != 0:
+            retcode = raw.get("retcode")
+            message = raw.get("message")
+            logger.error("[Error %s]: %s|%s", retcode, message, raw)
+            raise RuntimeError(raw)
+
         # 解析消息内容
         content = self._parse_message_content(raw.get("message", []))
 
@@ -190,7 +196,7 @@ class NapcatProtocol(ProtocolABC):
         # 解析 JSON 数据
         try:
             raw_dict: dict = json.loads(raw[0])
-            logger.info(f"接收到原始数据: {raw_dict}")
+            logger.debug(f"接收到原始数据: {raw_dict}")
         except json.JSONDecodeError as e:
             logger.error(f"JSON 解析失败: {e}")
             return None
@@ -253,7 +259,7 @@ class NapcatProtocol(ProtocolABC):
         from .nodes.node_base import BaseNode
 
         segments = []
-        nodes: list[MessageNodeT] = content.content.get_message_nodes()
+        nodes: list[MessageNodeT] = content.content
 
         for node in nodes:
             if isinstance(node, BaseNode):

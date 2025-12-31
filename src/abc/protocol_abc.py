@@ -10,16 +10,16 @@ from ast import Tuple
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, NewType, Optional, TypeVar
 
 from ..plugins_system.core.events import Event
+from .api_base import APIBase
+from .builder import MessageBuilder
+
+APIBaseT = TypeVar("APIBaseT", bound="APIBase")
+MessageBuilderT = TypeVar("MessageBuilderT", bound="MessageBuilder")
 
 if TYPE_CHECKING:
     from ..connector.abc import ABCWebSocketClient, MessageType
     from ..core.IM import Group, Message, User
     from ..utils.typec import GroupID, MsgId, UserID
-    from .api_base import APIBase
-    from .builder import MessageBuilder
-
-    APIBaseT = TypeVar("APIBaseT", bound=APIBase)
-    APIBaseT = TypeVar("APIBaseT", bound=APIBase)
 
 
 # def unsupported(func: Callable):
@@ -71,10 +71,7 @@ class ProtocolMeta(ABCMeta):
         return list(cls._protocols.keys())
 
 
-APIBaseT = TypeVar("APIBaseT", bound="APIBase")
-
-
-class ProtocolABC(Generic[APIBaseT], ABC, metaclass=ProtocolMeta):
+class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMeta):
     """
     最小抽象层基类
     定义固定的接口签名，所有协议必须实现
@@ -92,7 +89,7 @@ class ProtocolABC(Generic[APIBaseT], ABC, metaclass=ProtocolMeta):
 
     @property
     @abstractmethod
-    def protocol_name(self) -> Optional[APIBaseT]:
+    def protocol_name(self) -> str:
         """协议名称"""
 
     @property
@@ -102,7 +99,7 @@ class ProtocolABC(Generic[APIBaseT], ABC, metaclass=ProtocolMeta):
 
     @property
     @abstractmethod
-    def msg_builder(self) -> MessageBuilder:
+    def msg_builder(self) -> MessageBuilderT:
         """获取所属的消息构造器"""
 
     @property

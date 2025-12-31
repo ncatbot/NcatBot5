@@ -4,15 +4,13 @@ IM客户端
 """
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Self
 
 if TYPE_CHECKING:
     from ..abc.api_base import APIBase as APIBase
     from .IM import Group, Me, Message, User
 
-    APIBaseT = TypeVar("APIBaseT", bound=APIBase)
-
-from ..abc.protocol_abc import APIBaseT, ProtocolABC
+from ..abc.protocol_abc import APIBaseT, MessageBuilderT, ProtocolABC
 from ..utils.typec import GroupID, MsgId, UserID
 
 log = logging.getLogger("IMClient")
@@ -57,7 +55,7 @@ class IMClient(Generic[APIBaseT]):
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, protocol: ProtocolABC[APIBaseT]):
+    def __init__(self, protocol: ProtocolABC[APIBaseT, MessageBuilderT]):
         # 防止重复初始化
         if self._initialized:
             return
@@ -67,7 +65,7 @@ class IMClient(Generic[APIBaseT]):
                 return
 
             # 保存协议实例
-            self._protocol: "ProtocolABC" = protocol
+            self._protocol = protocol
             self._me: Optional["Me"] = None
             self._initialized = True
 
@@ -86,7 +84,7 @@ class IMClient(Generic[APIBaseT]):
         return cls._initialized
 
     @property
-    def protocol(self) -> ProtocolABC[APIBaseT]:
+    def protocol(self) -> ProtocolABC[APIBaseT, MessageBuilderT]:
         """获取当前协议实例"""
         if not self._initialized:
             raise RuntimeError("IMClient未初始化")
