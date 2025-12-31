@@ -6,7 +6,7 @@
 
 import zipfile
 from pathlib import Path
-from typing import AsyncIterable, List
+from typing import AsyncIterable, List, Optional
 
 import aiofiles.os
 
@@ -41,8 +41,6 @@ class DefaultPluginFinder(PluginFinder):
         sources: List[PluginSource] = []
 
         for plugin_dir in self.plugin_dirs:
-            print(plugin_dir)
-            print(not await aiofiles.os.path.exists(plugin_dir))
             if not await aiofiles.os.path.exists(plugin_dir):
                 continue
 
@@ -102,3 +100,47 @@ class DefaultPluginFinder(PluginFinder):
                 return any(name.endswith("__init__.py") for name in zf.namelist())
         except (zipfile.BadZipFile, OSError):
             return False
+
+    def find_plugin_by_path(self, file_path: Path) -> Optional[PluginSource]:
+        """根据文件路径查找对应的插件源"""
+        for plugin_dir in self.plugin_dirs:
+            if not plugin_dir.exists():
+                continue
+
+            # 检查是否为插件目录本身
+            if file_path == plugin_dir:
+                return None
+
+            # 检查是否为插件子目录或文件
+            try:
+                if file_path.is_relative_to(plugin_dir):
+                    # 向上查找包含__init__.py的目录
+                    current = file_path
+                    while current != plugin_dir.parent:
+                        if current.is_dir():
+                            init_file = current / "__init__.py"
+                            if init_file.exists():
+                                return PluginSource(
+                                    PluginSourceType.DIRECTORY, current, current.name
+                                )
+
+                        # 检查是否为.py文件
+                        if current.is_file() and current.suffix == ".py":
+                            module_name = current.stem
+                            if current.name != "__init__.py":
+                                return PluginSource(
+                                    PluginSourceType.FILE, current, module_name
+                                )
+
+                        # 检查是否为.zip文件
+                        if current.is_file() and current.suffix == ".zip":
+                            if self._is_valid_zip_plugin(current):
+                                module_name = current.stem
+                                return PluginSource(
+                                    PluginSourceType.ZIP_PACKAGE, current, module_name
+                                )
+
+                        current = current.parent
+            except ValueError:
+                continue
+        return None

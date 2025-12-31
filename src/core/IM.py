@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 # ---------------- 前置工具类型 ----------------
 from ..abc.nodes import MessageNode as MessageNode
+from ..utils.io import resource_open
 from ..utils.typec import GroupID, MsgId, UserID
 
 MessageNodeT = TypeVar("MessageNodeT", bound=MessageNode)
@@ -35,9 +36,9 @@ MessageNodeT = TypeVar("MessageNodeT", bound=MessageNode)
 # ---------------- 扩展信息（无依赖，放最前） ----------------
 @dataclass
 class UserInfo:
-    is_online: bool = False
+    is_online: Optional[bool] = False
     last_active: Optional[dt.datetime] = None
-    is_friend: bool = False
+    is_friend: Optional[bool] = False
     remark: Optional[str] = None
     gender: Optional[str] = None
     region: Optional[str] = None
@@ -318,9 +319,13 @@ class Message:
     """
 
     NORMAL = "normal"  # 普通消息
-    REPLY = "reply"  # 回复消息（可添加内容）
-    FORWARD = "forward"  # 转发消息（通常不添加内容）
+    """普通消息"""
+    REPLY = "reply"  # 回复消息
+    """回复消息"""
+    FORWARD = "forward"  # 转发消息
+    """转发消息"""
     SYSTEM = "system"  # 系统消息
+    """系统消息"""
 
     __slots__ = (
         "_id",
@@ -335,6 +340,7 @@ class Message:
         "_forward_info",
         "_client",
         "_info",
+        "_raw",
     )
 
     def __init__(
@@ -347,6 +353,7 @@ class Message:
         group_id: GroupID | None = None,
         reference: Optional[MessageReference] = None,
         forward_info: Optional[ForwardInfo] = None,
+        raw: dict = None,
     ):
         self._id = msg_id
         self._sender_id = sender_id
@@ -358,6 +365,7 @@ class Message:
         self._message_type = message_type
         self._reference = reference
         self._forward_info = forward_info
+        self._raw = raw
         from .client import IMClient
 
         self._client = IMClient.get_current()
@@ -366,6 +374,10 @@ class Message:
         self._info = MessageInfo()
 
     # 只读属性
+    @property
+    def raw(self) -> Optional[dict]:
+        return self._raw
+
     @property
     def id(self) -> Optional[MsgId]:
         return self._id
@@ -598,7 +610,7 @@ class Message:
         group_id: Optional[GroupID] = None,
         reference: Optional[MessageReference] = None,
         forward_info: Optional[ForwardInfo] = None,
-    ) -> "Message":
+    ) -> Message:
         """创建一条新消息（用于发送）"""
         from .client import IMClient
 
@@ -668,6 +680,8 @@ class Message:
 
 
 # ---------------- 用户 / 群组 / Me（依赖 Message / MessageChain） ----------------
+# NOTE * 如果实例来自协议，那么它必须是完整的，只有用户构建才是最小实例
+# TODO 完善检查
 class User:
     _client: Optional["IMClient"] = None
 
@@ -676,7 +690,13 @@ class User:
         uid: UserID,
         nickname: Optional[str] = None,
         avatar_url: Optional[str] = None,
+        info: Optional[UserInfo] = None,
+        from_protocol: Optional[bool] = None,
+        role: Optional[str] = None,
+        group_name: Optional[str] = None,
     ):
+        self._group_name = group_name
+        self._role = role
         self._uid = uid
         self._nickname = nickname
         self._avatar_url = avatar_url
@@ -685,25 +705,62 @@ class User:
         self._client = IMClient.get_current()
         if not self._client:
             raise ValueError("没有选择协议")
-        self.info = UserInfo()
+        # 协议实例必须完整
+        if from_protocol:
+            if nickname is None or avatar_url is None or info is None:
+                raise ValueError("协议实例必须完整 (nickname, avatar_url, info)")
+            self.info = info
+            self._is_full = True
+        else:
+            self.info = info if info is not None else UserInfo()
+            self._is_full = False
 
     @property
     def uid(self) -> UserID:
         return self._uid
 
+    @property
+    def role(self) -> Optional[str]:
+        return self._role
+
+    @property
+    def group_name(self) -> Optional[str]:
+        return self._group_name
+
+    @property
+    def nickname(self) -> Optional[str]:
+        return self._nickname
+
+    @property
+    def avatar_url(self) -> Optional[str]:
+        return self._avatar_url
+
+    @property
+    def is_full(self) -> bool:
+        """是否为完整协议实例"""
+        return self._is_full
+
     async def get_nickname(self) -> str:
         if self._nickname:
             return self._nickname
-        user_info = await self._client.get_user_info(self._uid)
-        self._nickname = user_info.get("nickname", "未知用户")
-        return self._nickname
+        # 若为协议实例，nickname 必须有
+        if self._is_full:
+            return self._nickname or str(self._uid)
+        # 否则尝试获取完整实例
+        user = await self._client.get_user(self._uid)
+        return await user.get_nickname()
 
     async def get_avatar_url(self) -> Optional[str]:
         if self._avatar_url:
             return self._avatar_url
-        user_info = await self._client.get_user_info(self._uid)
-        self._avatar_url = user_info.get("avatar_url")
-        return self._avatar_url
+        if self._is_full:
+            return self._avatar_url
+        user = await self._client.get_user(self._uid)
+        return await user.get_avatar_url()
+
+    async def get_avatar(self) -> bytes:
+        async with await resource_open(self.get_avatar_url()) as res:
+            return await res.read()
 
     # 私聊快捷
     async def send_text(self, text: str) -> Message:
@@ -744,8 +801,8 @@ class User:
         self, message: Message, extra_content: Optional[MessageChain] = None
     ) -> Message:
         """转发消息给当前用户"""
-        return await self._client.forward_private_message(
-            self._uid, message, extra_content
+        return await self._client.send_private_message(
+            self._uid, message.forward_to_user(self._uid, extra_content)
         )
 
     # 好友管理
@@ -794,6 +851,8 @@ class Group:
         name: Optional[str] = None,
         description: Optional[str] = None,
         avatar_url: Optional[str] = None,
+        info: Optional[GroupInfo] = None,
+        from_protocol: bool = False,
     ):
         self._gid = gid
         self._name = name
@@ -802,7 +861,23 @@ class Group:
         from .client import IMClient
 
         self._client = IMClient.get_current()
-        self.info = GroupInfo()
+        if from_protocol:
+            if name is None or avatar_url is None or info is None:
+                raise ValueError("协议实例必须完整 (name, avatar_url, info)")
+            self.info = info
+            self._is_full = True
+        else:
+            self.info = info if info is not None else GroupInfo()
+            self._is_full = False
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._description
+
+    @property
+    def is_full(self) -> bool:
+        """是否为完整协议实例"""
+        return self._is_full
 
     @property
     def gid(self) -> GroupID:
@@ -869,8 +944,8 @@ class Group:
         self, message: Message, extra_content: Optional[MessageChain] = None
     ) -> Message:
         """转发消息到当前群组"""
-        return await self._client.forward_group_message(
-            self._gid, message, extra_content
+        return await self._client.send_group_message(
+            self._gid, message.forward_to_group(self._gid, extra_content)
         )
 
     async def recall_message(self, message_id: MsgId) -> bool:
@@ -937,8 +1012,32 @@ class Group:
         return self.info.owner_id
 
     @property
-    def admin_ids(self) -> Optional[UserID]:
+    def admin_ids(self) -> list:
         return self.info.admin_ids
+
+    async def get_name(self) -> str:
+        if self._name:
+            return self._name
+        if self.is_full:
+            return self._name or f"群组 {self._gid}"
+        group = await self._client.get_group(self._gid)
+        return await group.get_name()
+
+    async def get_avatar_url(self) -> Optional[str]:
+        if self._avatar_url:
+            return self._avatar_url
+        if self.is_full:
+            return self._avatar_url
+        group = await self._client.get_group(self._gid)
+        return await group.get_avatar_url()
+
+    async def get_description(self) -> Optional[str]:
+        if self._description:
+            return self._description
+        if self.is_full:
+            return self._description
+        group = await self._client.get_group(self._gid)
+        return await group.get_description()
 
 
 class Me(User):

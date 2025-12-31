@@ -6,6 +6,8 @@ from .api_base import NCAPIBase
 class NCAPISystem(NCAPIBase):
     """系统接口"""
 
+    abc = False
+
     def get_client_key(
         self,
     ) -> Any:

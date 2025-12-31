@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import uuid
@@ -26,16 +25,10 @@ class NCAPIBase(APIBase):
             result["headers"] = request.headers
         return result
 
-    async def invoke(self, request: ApiRequest) -> Any:
+    async def invoke(self, request: ApiRequest) -> dict | None:
         """调用 NapCat API 并返回响应数据"""
         if not getattr(self, "client", None):
             raise RuntimeError("WebSocket 客户端未初始化，请先调用 login")
-
-        if not self.client.running:
-            await self.client.start()
-            await asyncio.sleep(0.1)
-            while self.client.connection.is_connected():
-                await asyncio.sleep(0.1)
 
         listener_id = await self.client.create_listener()
         echo = str(uuid.uuid4())

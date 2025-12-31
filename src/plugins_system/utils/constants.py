@@ -27,6 +27,14 @@ NAMESPACE = UUID("a980f9a7-09f1-91a8-61ba-20374cd0c393")
 """UUID命名空间常量"""
 
 
+class ReloadModes:
+    """重载模式常量"""
+
+    ALL = "all"  # 全量重载
+    SMART = "smart"  # 智能重载（只重载受影响插件）
+    SINGLE = "single"  # 单插件重载
+
+
 class FeatureFlags:
     """功能开关常量类
 
@@ -39,6 +47,14 @@ class FeatureFlags:
 
     当启用时，插件的事件处理器可以在插件的数据目录中执行，
     便于文件操作等需要特定工作目录的场景"""
+
+    # 插件重载模式: 'all' 表示总是重载全部插件，'single' 表示仅重载变动的单个插件
+    RELOAD_MODE: Final[ReloadModes] = ReloadModes.SINGLE
+    """插件重载模式
+
+    all: 任何变动都重载全部插件（兼容性好，简单）
+    single: 只重载变动的单个插件（高效，但需完善依赖处理）
+    """
 
     EVENT_BUS_IMPL: Final[
         Literal["SimpleEventBus", "NonBlockingEventBus", None]
@@ -89,6 +105,9 @@ class SystemEvents:
 
     RELOAD_REQUESTED = "system.reload_requested"
     """重载请求事件"""
+
+    RELOAD_STARTED = "system.reload_started"
+    """重载开始事件"""
 
     # 错误事件
     LOAD_ERROR = "system.load_error"

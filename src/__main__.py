@@ -1,16 +1,13 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Self
+from typing import Optional, Self
 
-from .abc.protocol_abc import ProtocolABC
+from .abc.protocol_abc import ProtocolABC, ProtocolMeta
 from .connector import AsyncWebSocketClient
 from .core.client import IMClient
 from .plugins_system import Event, EventBus, PluginApplication
 from .utils.constants import DefaultSetting, ProtocolName
-
-if TYPE_CHECKING:
-    pass
 
 log = logging.getLogger("Bot")
 One_Mod = True
@@ -56,9 +53,6 @@ class Bot:
             event_bus=DefaultSetting.event_bus,
         )
         self.event_bus: EventBus = self.plugin_sys.event_bus
-
-        # 协议层
-        from .abc.protocol_abc import ProtocolMeta
 
         protocol_class = ProtocolMeta.get_protocol(protocol)
         self._protocol: ProtocolABC = protocol_class()
@@ -144,14 +138,12 @@ class Bot:
         event_bus = self.event_bus
         listener_id = self.listener
 
-        # print(1)
         raw = await ws.get_message(listener_id)
-        print(raw[0])
         if raw:
-            event = protocol._parse_event(raw)  # 无阻塞
-            # await asyncio.sleep(0.1)
+            event = protocol._parse_event(raw)
             if isinstance(event, Event):
-                event_bus.publish_event(event)  # 无阻塞
+                await protocol.print_event(event)
+                event_bus.publish_event(event)
 
     # ---------- 优雅退出 ----------
     async def stop(self) -> None:
@@ -165,13 +157,6 @@ class Bot:
             )
         )
 
-        # 通知协议层注销
-        # if hasattr(self, "_protocol"):
-        #     tasks.append(
-        #         asyncio.create_task(
-        #             self._safe_coro("protocol.logout", self.protocol.logout())
-        #         )
-        #     )
         await self.protocol.logout()
 
         # 等待所有清理任务完成（超时 5s）

@@ -35,6 +35,9 @@ class Face(BaseNode):
     def get_summary(self) -> str:
         return self.face_text
 
+    def __str__(self):
+        return self.face_text
+
 
 # ==================== 可下载消息节点 ====================
 

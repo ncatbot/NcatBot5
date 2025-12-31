@@ -9,6 +9,8 @@ from .user import NCAPIUser
 class NCAPI(NCAPIBase):
     """napcatAPI封装"""
 
+    abc = False
+
     def __init__(self):
         super().__init__()
         # 创建子 API 实例

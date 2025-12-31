@@ -1,3 +1,4 @@
+import asyncio
 import datetime as dt
 import json
 import logging
@@ -5,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from ...abc.protocol_abc import ProtocolABC, RawGroup, RawMessage, RawUser
 from ...connector import AsyncWebSocketClient, MessageType
-from ...core.IM import Group, Message, MessageChain, MessageNodeT, User
+from ...core.IM import Group, Message, MessageChain, MessageNodeT, User, UserInfo
 from ...plugins_system.core.events import Event
 from ...utils.typec import GroupID, MsgId, UserID
 from .api import NCAPI
@@ -82,8 +83,19 @@ class NapcatProtocol(ProtocolABC):
 
         # 将客户端设置到API
         self._api.set_client(client)
-
+        listener = await client.create_listener()
         await client.start()
+        try:
+            msg = await client.get_message(listener)
+            await self._print_meta(self._parse_event(msg))
+        finally:
+            await client.remove_listener(listener)
+
+        if not self.client.running:
+            await self.client.start()
+            await asyncio.sleep(0.1)
+            while self.client.connection.is_connected():
+                await asyncio.sleep(0.1)
 
         return client
 
@@ -138,7 +150,7 @@ class NapcatProtocol(ProtocolABC):
     def _parse_message(self, raw: Dict[str, Any]) -> Message:
         """解析消息"""
 
-        if raw.get("retcode") != 0:
+        if raw.get("retcode"):
             retcode = raw.get("retcode")
             message = raw.get("message")
             logger.error("[Error %s]: %s|%s", retcode, message, raw)
@@ -148,28 +160,41 @@ class NapcatProtocol(ProtocolABC):
         content = self._parse_message_content(raw.get("message", []))
 
         # 解析时间戳
-        timestamp = raw.get("time")
-        if timestamp:
+        time = raw.get("time")
+        if time:
             try:
-                timestamp = dt.datetime.fromisoformat(timestamp)
+                timestamp = dt.datetime.fromisoformat(time)
             except (ValueError, TypeError):
                 timestamp = dt.datetime.now()
         else:
             timestamp = dt.datetime.now()
 
-        return Message(
-            msg_id=(str(raw.get("id", ""))),
-            sender_id=UserID(str(raw.get("sender_id", ""))),
+        msg = Message(
+            msg_id=MsgId.new("napcat", raw.get("message_id"), time),
+            sender_id=str(raw.get("user_id", "")),
             content=content,
+            # TODO 完善 message_type 部分
+            message_type=raw.get("message_type", "unknown"),
             timestamp=timestamp,
             group_id=GroupID(str(raw.get("group_id"))),
+            raw=raw,
         )
+        msg._sender_cache = self._parse_user(raw.get("sender"))
+
+        return msg
 
     def _parse_user(self, raw: Dict[str, Any]) -> User:
         """解析用户"""
+        info = UserInfo(
+            is_online=True,
+            last_active=dt.datetime.now(),
+        )
         return User(
-            uid=str(raw.get("user_id", raw.get("uid", ""))),
-            nickname=raw.get("nickname", raw.get("card", "")),
+            uid=str(raw.get("user_id")),
+            nickname=raw.get("nickname"),
+            role=raw.get("role"),
+            group_name=raw.get("card") or raw.get("nickname"),
+            info=info,
         )
 
     def _parse_group(self, raw: Dict[str, Any]) -> Group:
@@ -196,12 +221,10 @@ class NapcatProtocol(ProtocolABC):
         # 解析 JSON 数据
         try:
             raw_dict: dict = json.loads(raw[0])
-            logger.debug(f"接收到原始数据: {raw_dict}")
+            logger.debug("接收到原始数据: %s", raw_dict)
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 解析失败: {e}")
+            logger.error("JSON 解析失败: %s", e)
             return None
-
-        logger.debug("[NAPCAT] %s", raw_dict)
 
         # 跳过API响应（有echo字段的是响应，没有post_type的也跳过）
         if "echo" in raw_dict or "post_type" not in raw_dict:
@@ -223,30 +246,19 @@ class NapcatProtocol(ProtocolABC):
                 meta_event_type = raw_dict["meta_event_type"]
                 event_name = f"meta.{meta_event_type}"
 
-                match meta_event_type:
-                    case "connect":
-                        if hasattr(self, "_self_id") and self._self_id:
-                            logger.warning("重复连接事件，BotID 已存在: %s", self._self_id)
-                        self._self_id = str(raw_dict["self_id"])
-                        logger.info("协议对接成功 BotID: %s", self._self_id)
-
-                    case _:
-                        pass
-
             case _:
-                event_name = None
                 logger.warning("未知事件: %s", post_type)
+                return
 
         # 解析消息内容（仅对 message 类型）
         if post_type == "message":
             data = self._parse_message(raw=raw_dict)
-            logger.info(f"解析后的消息数据: {data}")
         else:
             data = raw_dict
 
         # 创建事件对象
         return Event(
-            event=event_name or post_type,
+            event=event_name,
             data=data,
             source="napcat",
             metadata={"post_type": post_type, "raw_event": raw_dict},
@@ -455,3 +467,123 @@ class NapcatProtocol(ProtocolABC):
             sex=sex,
         )
         return response.get("status") == "ok"
+
+    async def print_event(self, event: Event) -> None:
+        """线程安全 / 异常吞噬，保证绝不抛给上游"""
+        try:
+            await self._do_print(event)
+        except Exception as e:
+            logger.error("print failed: %s | event=%s", e, event)
+
+    # ------------------------- 内部分发 ------------------------- #
+    async def _do_print(self, event: Event) -> None:
+        post_type, *_ = event.event.split(".", 1)
+        match post_type:
+            case "message":
+                await self._print_message(event)
+            # TODO 完善消息提示
+            # case "notice":
+            #     await self._print_notice(event)
+            # case "request":
+            #     await self._print_request(event)
+            case "meta":
+                await self._print_meta(event)
+            case _:
+                logger.debug("[UnknownEvent] %s", event.event)
+
+    # ------------------------- message 分支 ------------------------- #
+    async def _print_message(self, event: Event[Message]) -> None:
+        msg = event.data
+        sender = await msg.get_sender()
+        groupi = await msg.get_group()
+        nick = await sender.get_nickname()
+        if groupi:
+            name = await groupi.get_name()
+            logger.info(
+                "[%s(%s)] %s(%s) -> %s", name, msg.group_id, nick, sender.uid, str(msg)
+            )
+        else:
+            logger.info("[%s(%s)] -> %s", nick, sender.uid, str(msg))
+
+    # ------------------------- notice 分支 ------------------------- #
+    async def _print_notice(self, event: Event) -> None:
+        n = event.data
+        match event.event:
+            case "notice.group_upload":
+                filename = n.file.get("name") or "unknown"
+                logger.info("[群文件] 群 %s 上传：%s", n.group_id, filename)
+
+            case "notice.group_admin":
+                action = "设置" if n.sub_type == "set" else "取消"
+                logger.info("[群管理] 群 %s %s管理员 %s", n.group_id, action, n.user_id)
+
+            case "notice.group_decrease":
+                logger.info("[群成员] 群 %s 成员减少 %s", n.group_id, n.user_id)
+
+            case "notice.group_increase":
+                logger.info("[群成员] 群 %s 成员增加 %s", n.group_id, n.user_id)
+
+            case "notice.group_ban":
+                action = "禁言" if n.sub_type == "ban" else "解除禁言"
+                logger.info("[群禁言] 群 %s %s %s", n.group_id, action, n.user_id)
+
+            case "notice.friend_add":
+                logger.info("[好友] 新好友 %s", n.user_id)
+
+            case "notice.group_recall":
+                logger.info("[群撤回] 群 %s 消息 %s 被撤回", n.group_id, n.message_id)
+
+            case "notice.friend_recall":
+                logger.info("[私聊撤回] 好友 %s 撤回消息 %s", n.user_id, n.message_id)
+
+            case "notice.notify.poke":
+                logger.info("[戳一戳] 群 %s | %s → %s", n.group_id, n.user_id, n.target_id)
+
+            case "notice.notify.lucky_king":
+                logger.info("[红包运气王] 群 %s → %s", n.group_id, n.target_id)
+
+            case "notice.notify.honor":
+                logger.info("[群荣誉] 群 %s 成员 %s 荣誉变更", n.group_id, n.user_id)
+
+            case _:
+                logger.debug("[Notice] 未打印子类型：%s", event.event)
+
+    # ------------------------- request 分支 ------------------------- #
+    async def _print_request(self, event: Event) -> None:
+        r = event.data
+        flag = r.flag
+        if len(flag) > 16:
+            flag = flag[:16] + "…"
+        match event.event:
+            case "request.friend":
+                logger.info(
+                    "[加好友请求] %s 申请：%s（flag=%s）", r.user_id, r.comment or "", flag
+                )
+            case "request.group":
+                logger.info(
+                    "[加群请求] 群 %s | %s 申请：%s（flag=%s）",
+                    r.group_id,
+                    r.user_id,
+                    r.comment or "",
+                    flag,
+                )
+            case _:
+                logger.debug("[Request] 未打印子类型：%s", event.event)
+
+    # ------------------------- meta 分支 ------------------------- #
+    async def _print_meta(self, event: Event[Message]) -> None:
+        m = event.data
+        match event.event:
+            case "meta.lifecycle":
+                self._self_id = m["self_id"]
+                logger.info("Bot.%s 启动", m["self_id"])
+                logger.name = f"Bot.{m['self_id']}"
+            case "meta.heartbeat":
+                online = m["status"]["online"]
+                good = m["status"]["good"]
+                if online and good:
+                    logger.debug("[心跳] t=%s status=%s", m["time"], m["status"])
+                else:
+                    logger.exception("服务异常 online:%s, good:%s", online, good)
+            case _:
+                logger.debug("[Meta] 未打印子类型：%s", event.event)

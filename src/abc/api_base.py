@@ -24,11 +24,13 @@ class ApiRequest(Generic[T]):
 class ApiMeta(ABCMeta):
     """API元类 - 自动包装所有方法到invoke"""
 
+    abc = True
+
     def __new__(mcs, name, bases, namespace):
         cls = super().__new__(mcs, name, bases, namespace)
 
         # 跳过抽象基类
-        if cls.__abstractmethods__:  # 非空即真
+        if cls.abc:
             return cls
 
         assert isinstance(namespace, dict)

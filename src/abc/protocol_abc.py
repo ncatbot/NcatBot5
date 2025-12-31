@@ -338,3 +338,7 @@ class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMet
     @abstractmethod
     async def update_self_profile(self, profile_data: Dict[str, Any]) -> bool:
         """批量更新个人资料"""
+
+    @abstractmethod
+    async def print_event(self, msg: Event) -> None:
+        """打印事件"""

@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Fcatbot"
-# version is read dynamically from src/meta.py
+name = "ncatbot5"
+# version 读取 src/meta.py
 dynamic = ["version"]
 description = "一个基于通信协议的 Python Bot SDK"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 license = "MIT"
-# keywords = ["bot", "plugin", "protocol", "IM"]
+keywords = ["ncatbot", "ncatbot5"]
 authors = [{ name = "Fish-LP", email = "Fish.zh@outlook.com" }]
 maintainers = [{ name = "Fish-LP", email = "Fish.zh@outlook.com" }]
 classifiers = [
@@ -39,9 +39,9 @@ test = ["pytest"]
 dev = ["pre-commit", "lint", "test"]
 ai-helper = ["gitingest"]
 
-# [project.urls]
-# "Homepage" = "https://example.com/"   # replace with actual project URL
-# "Repository" = "https://example.com/" # replace with actual repo URL
+[project.urls]
+"Homepage" = "https://ncatbot.xyz/"
+"Repository" = "https://github.com/ncatbot/NcatBot5"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -52,10 +52,9 @@ where = ["src"]
 [tool.setuptools.dynamic.version]
 attr = "meta.__version__"
 
-# [project.scripts]
-# bot = "src.__main__:main"
+[project.scripts]
+ncatbot = "src.__main__:main"
 
-# Hatch build hooks
-[tool.hatch.build.targets.wheel.hooks]
-# runs before wheel build; points to a callable `cat.hatch_hooks:pre_build`
-pre-build = ["cat.hatch_hooks:pre_build"]
+# # Hatch build hooks
+# [tool.hatch.build.targets.wheel.hooks]
+# pre-build = ["cat.hatch_hooks:pre_build"]

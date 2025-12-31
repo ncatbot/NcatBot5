@@ -15,10 +15,6 @@ class BaseNode(MessageNode):
     _str_exclude = {""}  # 排除在str中的属性集合
     _node_type: str = ""
 
-    def __str__(self):
-        core_properties_str: str = self.get_core_properties_str()
-        return f"{self.__class__.__name__}({core_properties_str})"
-
     def get_core_properties_str(self) -> str:
         excludes = set(getattr(self, "_repr_exclude", ()))
         props = {
@@ -50,7 +46,9 @@ class BaseNode(MessageNode):
 
     @classmethod
     def from_dto(cls, data: "BaseDto") -> "BaseNode":
-        logger.info(f"从DTO创建节点: {data}")
         data_dict = data.to_dict()
-        logger.info(f"节点字典: {data_dict}")
+        logger.debug(f"节点字典: {data} -> {data_dict}")
         return cls(**data_dict)
+
+    def __str__(self):
+        return self.get_summary()

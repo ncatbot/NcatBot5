@@ -65,6 +65,22 @@ class PluginSource:
             for name in modules_to_remove:
                 del sys.modules[name]
 
+    def contains_path(self, file_path: Path) -> bool:
+        """检查给定路径是否属于此插件源"""
+        try:
+            if self.source_type == PluginSourceType.DIRECTORY:
+                # 对于目录型插件，检查路径是否在插件目录内
+                return file_path.is_relative_to(self.path)
+            elif self.source_type == PluginSourceType.FILE:
+                # 对于文件型插件，检查是否为同一个文件
+                return file_path == self.path
+            elif self.source_type == PluginSourceType.ZIP_PACKAGE:
+                # 对于ZIP包，检查是否为同一个ZIP文件
+                return file_path == self.path
+            return False
+        except ValueError:
+            return False
+
 
 class PluginContext:
     """插件上下文类 - 简化版本"""

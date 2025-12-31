@@ -6,6 +6,8 @@ from .message import NCAPIMessage
 class NCAPIGroup(NCAPIMessage):
     """napcatAPI群组类"""
 
+    abc = False
+
     async def send_group_message(
         self,
         group_id: Union[str, int],

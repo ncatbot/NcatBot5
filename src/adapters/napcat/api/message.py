@@ -6,6 +6,8 @@ from .api_base import NCAPIBase
 class NCAPIMessage(NCAPIBase):
     """napcatAPI消息类"""
 
+    abc = False
+
     async def delete_msg(
         self,
         message_id: Union[int, str],

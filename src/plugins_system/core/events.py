@@ -13,7 +13,19 @@ import traceback
 from abc import abstractmethod
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Dict, List, Optional, Pattern, Set, Tuple, Union
+from typing import (
+    Any,
+    Awaitable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Pattern,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 from uuid import UUID, uuid4
 
 from ..abc.events import EventBus
@@ -21,11 +33,13 @@ from ..utils.constants import DEBUG_MODE, FeatureFlags
 from ..utils.helpers import _get_current_task_name
 from ..utils.types import EventHandler, EventInterceptor, PluginName
 
+T = TypeVar("T")
+
 logger = logging.getLogger("PluginsSys")
 
 
 @dataclass
-class Event:
+class Event(Generic[T]):
     """事件类
 
     表示在事件总线中传递的事件对象
@@ -44,7 +58,7 @@ class Event:
     """
 
     event: str
-    data: Any = None
+    data: Optional[T] = None
     source: Optional[Any] = None
     target: Optional[Any] = None
     timestamp: float = field(default_factory=time.time)

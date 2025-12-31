@@ -6,6 +6,8 @@ from .message import NCAPIMessage
 class NCAPIUser(NCAPIMessage):
     """napcatAPI用户类"""
 
+    abc = False
+
     async def send_private_msg(
         self,
         user_id: Union[str, int],
@@ -242,6 +244,8 @@ class NCAPIUser(NCAPIMessage):
         Returns:
             API响应数据
         """
+        if not user_id:
+            pass
         return (
             "get_stranger_info",
             {
