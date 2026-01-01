@@ -2,12 +2,13 @@ import asyncio
 import datetime as dt
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypeVar
 
 from ...abc.protocol_abc import ProtocolABC, RawGroup, RawMessage, RawUser
 from ...connector import AsyncWebSocketClient, MessageType
 from ...core.IM import Group, Message, MessageChain, MessageNodeT, User, UserInfo
 from ...plugins_system.core.events import Event
+from ...utils.logformat import LogFormats
 from ...utils.typec import GroupID, MsgId, UserID
 from .api import NCAPI
 from .builder import MessageBuilder
@@ -40,6 +41,7 @@ class NapcatProtocol(ProtocolABC):
     async def send_group_message(self, gid: GroupID, content: Message) -> RawMessage:
         """发送群消息"""
         # 将 Message 转换为 napcat 的消息格式
+        self._print_message(Event(event="message.group", data=content))
         message_segments = self._content_to_segments(content)
 
         # 调用 API 发送
@@ -51,6 +53,7 @@ class NapcatProtocol(ProtocolABC):
 
     async def send_private_message(self, uid: UserID, content: Message) -> RawMessage:
         """发送私聊消息"""
+        self._print_message(Event(event="message.private", data=content))
         # 将 Message 转换为 napcat 的消息格式
         message_segments = self._content_to_segments(content)
 
@@ -171,12 +174,12 @@ class NapcatProtocol(ProtocolABC):
 
         msg = Message(
             msg_id=MsgId.new("napcat", raw.get("message_id"), time),
-            sender_id=str(raw.get("user_id", "")),
+            sender_id=str(raw["user_id"]) if raw.get("user_id") else None,
             content=content,
             # TODO 完善 message_type 部分
             message_type=raw.get("message_type", "unknown"),
             timestamp=timestamp,
-            group_id=GroupID(str(raw.get("group_id"))),
+            group_id=str(raw["group_id"]) if raw.get("group_id") else None,
             raw=raw,
         )
         msg._sender_cache = self._parse_user(raw.get("sender"))
@@ -285,22 +288,26 @@ class NapcatProtocol(ProtocolABC):
 
     def _parse_message_content(self, segments: List[dict]) -> MessageChain:
         """解析 napcat 消息段为 Message"""
-        from .nodes import Text
-        from .nodes.dto import TextDTO
+        from . import nodes
+        from .nodes import dto
+        from .nodes.dto import BaseDto
+        from .nodes.node_base import NodeT
 
-        nodes = []
+        Dto = TypeVar("Dto", bound=BaseDto)
+
+        node = []
 
         for seg in segments:
-            seg_type = seg.get("type")
+            seg_type: str = seg.get("type")
             data: dict = seg.get("data", {})
+            node_model: NodeT = getattr(nodes, seg_type.capitalize(), None)
+            dto_model: Dto = getattr(dto, f"{seg_type.capitalize()}DTO", None)
 
-            if seg_type == "text":
-                text_dto: TextDTO = TextDTO.from_dict(data)
-                nodes.append(Text.from_dto(text_dto))
+            if dto_model and node_model:
+                dto_class = dto_model.from_dict(data)
+                node.append(node_model.from_dto(dto_class))
 
-            # 其他类型继续扩展
-
-        return MessageChain(nodes=nodes)
+        return MessageChain(nodes=node)
 
     # ========== 好友管理 ==========
 
@@ -495,15 +502,14 @@ class NapcatProtocol(ProtocolABC):
     async def _print_message(self, event: Event[Message]) -> None:
         msg = event.data
         sender = await msg.get_sender()
-        groupi = await msg.get_group()
+        group_id = msg.group_id
         nick = await sender.get_nickname()
-        if groupi:
+        if group_id:
+            groupi = await msg.get_group()
             name = await groupi.get_name()
-            logger.info(
-                "[%s(%s)] %s(%s) -> %s", name, msg.group_id, nick, sender.uid, str(msg)
-            )
+            logger.info(LogFormats.modern(group_id, nick, sender.uid, msg, name))
         else:
-            logger.info("[%s(%s)] -> %s", nick, sender.uid, str(msg))
+            logger.info(LogFormats.modern(None, nick, sender.uid, msg))
 
     # ------------------------- notice 分支 ------------------------- #
     async def _print_notice(self, event: Event) -> None:
@@ -582,7 +588,8 @@ class NapcatProtocol(ProtocolABC):
                 online = m["status"]["online"]
                 good = m["status"]["good"]
                 if online and good:
-                    logger.debug("[心跳] t=%s status=%s", m["time"], m["status"])
+                    # logger.debug("[心跳] t=%s status=%s", m["time"], m["status"])
+                    pass
                 else:
                     logger.exception("服务异常 online:%s, good:%s", online, good)
             case _:

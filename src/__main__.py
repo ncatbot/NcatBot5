@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional, Self
+from typing import ClassVar, Literal, Optional, Self
 
 from .abc.protocol_abc import ProtocolABC, ProtocolMeta
 from .connector import AsyncWebSocketClient
@@ -22,7 +22,7 @@ class Bot:
     """机器人框架统一入口"""
 
     # --- 类级状态 ---
-    running: bool = False  # 是否有实例在运行
+    running: ClassVar[bool] = False  # 是否有实例在运行
 
     # --- 实例级属性 ---
     plugin_sys: PluginApplication
@@ -39,6 +39,8 @@ class Bot:
         protocol: ProtocolName = "napcat",
         config_dir: Path | str = "config",
         data_dir: Path | str = "data",
+        debug: bool = DefaultSetting.debug,
+        reload_mode: Literal["all", "smart", "single"] = "smart",
     ):
         # 插件系统
         plugin_dirs = [Path(__file__).resolve().parent / "sys_plugin"]
@@ -49,7 +51,8 @@ class Bot:
             plugin_dirs=plugin_dirs,
             config_dir=config_dir,
             data_dir=data_dir,
-            dev_mode=DefaultSetting.debug,  # NOTE 热重载
+            dev_mode=debug,  # NOTE 热重载
+            reload_mode=reload_mode,
             event_bus=DefaultSetting.event_bus,
         )
         self.event_bus: EventBus = self.plugin_sys.event_bus

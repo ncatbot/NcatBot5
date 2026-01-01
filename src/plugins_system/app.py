@@ -39,6 +39,7 @@ class PluginApplication:
         plugin_manager: Optional[PluginManager] = None,
         max_workers: int = DEFAULT_MAX_WORKERS,
         dev_mode: bool = DEBUG_MODE,
+        reload_mode: str = FeatureFlags.RELOAD_MODE,
     ):
         """初始化插件应用程序
 
@@ -72,7 +73,12 @@ class PluginApplication:
                 case None:
                     raise ValueError("没有选择有效默认事件总线且没有自定义事件总线传入")
         self.plugin_manager = plugin_manager or DefaultPluginManager(
-            self.plugin_dirs, self.config_dir, self.data_dir, self.event_bus, dev_mode
+            self.plugin_dirs,
+            self.config_dir,
+            self.data_dir,
+            self.event_bus,
+            dev_mode,
+            reload_mode,
         )
         self._running = False
 

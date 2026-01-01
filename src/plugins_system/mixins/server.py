@@ -914,8 +914,8 @@ class ServiceResolver(LazyDecoratorResolver):
             )
 
             if uuid_:
-                plugin.logger.info(
-                    f"服务注册成功: '{service_name}' v{version} "
+                plugin.logger.debug(
+                    f"服务注册: '{service_name}' v{version} "
                     f"(事件模式: {event_mod}, 标签: {tags})"
                 )
             else:

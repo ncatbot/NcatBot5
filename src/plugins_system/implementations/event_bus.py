@@ -104,7 +104,7 @@ class SimpleEventBus(EventBusBase):
         handlers = self._get_matching_handlers(processed_event.event)
 
         if not handlers:
-            logger.debug(f"无处理器匹配事件: {processed_event.event}")
+            # logger.debug(f"无处理器匹配事件: {processed_event.event}")
             return
 
         for handler_info in handlers:
@@ -157,7 +157,7 @@ class SimpleEventBus(EventBusBase):
         handlers = self._get_matching_handlers(processed_event.event)
 
         if not handlers:
-            logger.debug(f"无处理器匹配事件: {processed_event.event}")
+            # logger.debug(f"无处理器匹配事件: {processed_event.event}")
             return {}
 
         tasks: Dict[UUID, asyncio.Task] = {}
@@ -342,7 +342,7 @@ class NonBlockingEventBus(EventBusBase):
         handlers = self._get_matching_handlers(processed_event.event)
 
         if not handlers:
-            logger.debug(f"无处理器匹配事件: {processed_event.event}")
+            # logger.debug(f"无处理器匹配事件: {processed_event.event}")
             return
 
         for handler_info in handlers:
@@ -378,7 +378,7 @@ class NonBlockingEventBus(EventBusBase):
         handlers = self._get_matching_handlers(processed_event.event)
 
         if not handlers:
-            logger.debug(f"无处理器匹配事件: {processed_event.event}")
+            # logger.debug(f"无处理器匹配事件: {processed_event.event}")
             return {}
 
         tasks: Dict[UUID, asyncio.Task] = {}

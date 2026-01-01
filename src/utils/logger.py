@@ -9,6 +9,7 @@
 import json
 import logging
 import os
+import re
 import warnings
 from logging.handlers import TimedRotatingFileHandler
 
@@ -145,6 +146,14 @@ LOG_LEVEL_TO_COLOR = {
 }
 
 
+class StripAnsiFilter(logging.Filter):
+    ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+    def filter(self, record):
+        record.msg = self.ANSI_RE.sub("", str(record.msg))
+        return True
+
+
 # 定义动态格式化器，根据日志级别选择不同的格式
 class DynamicFormatter(logging.Formatter):
     """根据日志记录级别动态选择格式的格式化器"""
@@ -181,7 +190,6 @@ class DynamicFormatter(logging.Formatter):
             )
             # 添加统一颜色字段
             record.colored_name = f"{Color.MAGENTA}{record.name}{Color.RESET}"
-            # 添加毫秒信息用于ERROR级别格式
         else:
             record.colored_levelname = record.levelname
             record.colored_name = record.name
@@ -261,6 +269,7 @@ def setup_logging(console_level=None):
         use_color=False,
     )
     root_file_handler.setFormatter(file_formatter)
+    root_file_handler.addFilter(StripAnsiFilter())
 
     # 添加处理器到根记录器
     root_logger.handlers = [console_handler, root_file_handler]
