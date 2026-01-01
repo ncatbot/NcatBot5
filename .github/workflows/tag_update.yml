@@ -19,7 +19,11 @@ jobs:
       - name: 提取新版本号
         id: version
         run: |
-          VERSION=$(grep -p '__version__\s*=' src/meta.py | cut -d\" -f2)
+          VERSION=$(sed -n 's/^__version__ = "\([^\"]*\)".*$/\1/p' src/meta.py)
+          if [ -z "$VERSION" ]; then
+            echo "Could not extract version from src/meta.py" >&2
+            exit 1
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: 创建并推送 tag
