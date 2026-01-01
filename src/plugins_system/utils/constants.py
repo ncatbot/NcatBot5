@@ -56,9 +56,9 @@ class FeatureFlags:
     single: 只重载变动的单个插件（高效，但需完善依赖处理）
     """
 
-    EVENT_BUS_IMPL: Final[
-        Literal["SimpleEventBus", "NonBlockingEventBus", None]
-    ] = "SimpleEventBus"
+    EVENT_BUS_IMPL: Final[Literal["SimpleEventBus", "NonBlockingEventBus", None]] = (
+        "SimpleEventBus"
+    )
 
     INTERCEPTOR_SHORT_CIRCUIT: Final[bool] = False
 

@@ -44,7 +44,7 @@ def handler_to_uuid(func: Callable) -> uuid.UUID:
 
 
 def compile_event_pattern(
-    event_pattern: Union[str, Pattern[str]]
+    event_pattern: Union[str, Pattern[str]],
 ) -> Tuple[Union[str, Pattern[str]], bool]:
     """编译事件模式
 
@@ -66,7 +66,9 @@ def compile_event_pattern(
             compiled_pattern = re.compile(pattern_str)
             return compiled_pattern, True
         except re.error as e:
-            logger.warning(f"无效的正则表达式模式 '{pattern_str}': {e}, 将作为普通字符串处理")
+            logger.warning(
+                f"无效的正则表达式模式 '{pattern_str}': {e}, 将作为普通字符串处理"
+            )
             return event_pattern, False
 
     # 普通字符串模式

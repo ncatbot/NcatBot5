@@ -1,6 +1,7 @@
 """
 延迟装饰器解析器模块
 """
+
 from __future__ import annotations
 
 import threading

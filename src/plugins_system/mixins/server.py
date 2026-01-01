@@ -186,9 +186,13 @@ def _create_service_handler(
 
             if not service_info.is_available:
                 logger.warning(
-                    "服务 %s 当前不可用，状态: %s", service_info.name, service_info.state
+                    "服务 %s 当前不可用，状态: %s",
+                    service_info.name,
+                    service_info.state,
                 )
-                return ServiceResult.error_result(f"服务不可用，当前状态: {service_info.state}")
+                return ServiceResult.error_result(
+                    f"服务不可用，当前状态: {service_info.state}"
+                )
 
             try:
                 # 创建meta对象（在所有模式下都创建）
@@ -232,9 +236,9 @@ def _create_service_handler(
                         if k in sig.parameters and k != "meta":
                             param = sig.parameters[k]
                             if not _isinstance_safe(v, param.annotation):
-                                type_errors[
-                                    k
-                                ] = f"期望 {param.annotation}, 收到 {type(v).__name__}"
+                                type_errors[k] = (
+                                    f"期望 {param.annotation}, 收到 {type(v).__name__}"
+                                )
 
                     if type_errors:
                         error_msg = f"参数类型错误: {type_errors}"
@@ -263,7 +267,9 @@ def _create_service_handler(
                     need = len([p for p in pos_params if p != "meta"])  # 排除meta参数
 
                     if not has_var_pos and len(seq) != need:
-                        error_msg = f"位置参数数量不符: 收到 {len(seq)} 个，需要 {need} 个"
+                        error_msg = (
+                            f"位置参数数量不符: 收到 {len(seq)} 个，需要 {need} 个"
+                        )
                         logger.error("%s | 期望签名 %s", error_msg, sig)
                         return ServiceResult.error_result(
                             error_msg, time.time() - start_time
@@ -325,9 +331,13 @@ def _create_service_handler(
 
             if not service_info.is_available:
                 logger.warning(
-                    "服务 %s 当前不可用，状态: %s", service_info.name, service_info.state
+                    "服务 %s 当前不可用，状态: %s",
+                    service_info.name,
+                    service_info.state,
                 )
-                return ServiceResult.error_result(f"服务不可用，当前状态: {service_info.state}")
+                return ServiceResult.error_result(
+                    f"服务不可用，当前状态: {service_info.state}"
+                )
 
             try:
                 # 创建meta对象（在所有模式下都创建）
@@ -371,9 +381,9 @@ def _create_service_handler(
                         if k in sig.parameters and k != "meta":
                             param = sig.parameters[k]
                             if not _isinstance_safe(v, param.annotation):
-                                type_errors[
-                                    k
-                                ] = f"期望 {param.annotation}, 收到 {type(v).__name__}"
+                                type_errors[k] = (
+                                    f"期望 {param.annotation}, 收到 {type(v).__name__}"
+                                )
 
                     if type_errors:
                         error_msg = f"参数类型错误: {type_errors}"
@@ -402,7 +412,9 @@ def _create_service_handler(
                     need = len([p for p in pos_params if p != "meta"])  # 排除meta参数
 
                     if not has_var_pos and len(seq) != need:
-                        error_msg = f"位置参数数量不符: 收到 {len(seq)} 个，需要 {need} 个"
+                        error_msg = (
+                            f"位置参数数量不符: 收到 {len(seq)} 个，需要 {need} 个"
+                        )
                         logger.error("%s | 期望签名 %s", error_msg, sig)
                         return ServiceResult.error_result(
                             error_msg, time.time() - start_time
@@ -804,7 +816,9 @@ class ServiceMixin(PluginMixin):
         elif current_state == ServiceState.PAUSED:
             return self.set_service_state(service_name, ServiceState.ONLINE)
         else:
-            self.logger.warning("服务 %s 当前状态 %s 不允许切换", service_name, current_state)
+            self.logger.warning(
+                "服务 %s 当前状态 %s 不允许切换", service_name, current_state
+            )
             return False
 
     def __do_set_service_state(
@@ -820,17 +834,23 @@ class ServiceMixin(PluginMixin):
         # 检查状态转换是否允许
         if force:
             info.state = new_state
-            self.logger.info("服务 %s 状态强制切换: %s -> %s", info.name, info.state, new_state)
+            self.logger.info(
+                "服务 %s 状态强制切换: %s -> %s", info.name, info.state, new_state
+            )
             return True
 
         checker = info.state_checker
         if checker is None or checker(info.state, new_state):
             old_state = info.state
             info.state = new_state
-            self.logger.info("服务 %s 状态切换: %s -> %s", info.name, old_state, new_state)
+            self.logger.info(
+                "服务 %s 状态切换: %s -> %s", info.name, old_state, new_state
+            )
             return True
 
-        self.logger.warning("服务 %s 状态切换被拒绝: %s -> %s", info.name, info.state, new_state)
+        self.logger.warning(
+            "服务 %s 状态切换被拒绝: %s -> %s", info.name, info.state, new_state
+        )
         return False
 
     # -------------------- 服务发现 --------------------

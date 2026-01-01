@@ -194,7 +194,9 @@ if __name__ == "__main__":
     import argparse
     import sys
 
-    parser = argparse.ArgumentParser(prog="bot", description="机器人框架 CLI：启动、停止、查看状态等。")
+    parser = argparse.ArgumentParser(
+        prog="bot", description="机器人框架 CLI：启动、停止、查看状态等。"
+    )
     sub = parser.add_subparsers(dest="cmd", help="子命令")
 
     # start

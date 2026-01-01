@@ -110,7 +110,9 @@ class Event(Generic[T]):
             事件字典表示
         """
         if not DEBUG_MODE and include_stack:
-            logger.warning("包含堆栈信息（include_stack=True）在非调试模式（DEBUG_MODE=False）下 ")
+            logger.warning(
+                "包含堆栈信息（include_stack=True）在非调试模式（DEBUG_MODE=False）下 "
+            )
 
         d = {
             "id": str(self.id),
@@ -260,7 +262,9 @@ class EventBusBase(EventBus):
                     # 拦截事件，停止后续处理
                     intercepted = True
                     if FeatureFlags.INTERCEPTOR_SHORT_CIRCUIT:
-                        logger.debug(f"拦截器 {interceptor_id} 拦截了事件: {current_event}")
+                        logger.debug(
+                            f"拦截器 {interceptor_id} 拦截了事件: {current_event}"
+                        )
                         return current_event, True
                     # 如果不短路，继续执行但标记为已拦截
                     intercepted = True
@@ -275,7 +279,9 @@ class EventBusBase(EventBus):
                     pass
 
                 else:
-                    logger.warning(f"拦截器 {interceptor_id} 返回了不支持的类型: {type(result)}")
+                    logger.warning(
+                        f"拦截器 {interceptor_id} 返回了不支持的类型: {type(result)}"
+                    )
 
             except Exception as e:
                 logger.exception(f"拦截器 {interceptor_id} 执行异常: {e}")
@@ -390,7 +396,9 @@ class EventBusBase(EventBus):
                         del self._handlers[handler_id]
                         count += 1
 
-        logger.debug(f"[{self.__class__.__name__}] 卸载插件 {plugin_name} 的 {count} 个处理器")
+        logger.debug(
+            f"[{self.__class__.__name__}] 卸载插件 {plugin_name} 的 {count} 个处理器"
+        )
         return count
 
     def is_closed(self) -> bool:
@@ -545,7 +553,9 @@ class EventBusBase(EventBus):
                 results[handler_id] = result
             except asyncio.TimeoutError:
                 logger.warning(f"处理器 {handler_id} 执行超时")
-                results[handler_id] = asyncio.TimeoutError(f"处理器执行超时 ({timeout}s)")
+                results[handler_id] = asyncio.TimeoutError(
+                    f"处理器执行超时 ({timeout}s)"
+                )
             except Exception as e:
                 logger.error(f"处理器 {handler_id} 执行异常: {e}")
                 results[handler_id] = e

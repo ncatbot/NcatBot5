@@ -453,7 +453,9 @@ class Plugin(ABC, metaclass=PluginMeta):
                         self._mixin_loaded.add(mixin_class)
                         self.logger.debug(f"混入类 {mixin_class.__name__} 加载完成")
                     except Exception as e:
-                        self.logger.error(f"混入类 {mixin_class.__name__} 加载失败: {e}")
+                        self.logger.error(
+                            f"混入类 {mixin_class.__name__} 加载失败: {e}"
+                        )
 
     async def _unload_mixins(self) -> None:
         """卸载所有混入类"""
@@ -467,7 +469,9 @@ class Plugin(ABC, metaclass=PluginMeta):
                             await result
                         self.logger.debug(f"混入类 {mixin_class.__name__} 卸载完成")
                     except Exception as e:
-                        self.logger.error(f"混入类 {mixin_class.__name__} 卸载失败: {e}")
+                        self.logger.error(
+                            f"混入类 {mixin_class.__name__} 卸载失败: {e}"
+                        )
 
         self._mixin_loaded.clear()
 

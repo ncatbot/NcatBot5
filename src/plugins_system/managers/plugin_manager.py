@@ -54,7 +54,8 @@ def _topological_sort(plugins: List[Plugin]) -> List[Plugin]:
         for dep_name, version_spec in p.dependency.items():
             if dep_name not in name_to_plugin:
                 raise PluginDependencyError(
-                    f"插件 {p.name} 依赖缺失: {dep_name} {version_spec}", plugin_name=p.name
+                    f"插件 {p.name} 依赖缺失: {dep_name} {version_spec}",
+                    plugin_name=p.name,
                 )
             dep_plugin = name_to_plugin[dep_name]
             if not _version_satisfies(dep_plugin.version, version_spec):
@@ -79,7 +80,8 @@ def _topological_sort(plugins: List[Plugin]) -> List[Plugin]:
     if len(sorted_names) != len(plugins):
         remaining = [name for name in in_degree if in_degree[name] > 0]
         raise PluginDependencyError(
-            f"插件之间存在循环依赖: {remaining}", plugin_name=remaining[0] if remaining else None
+            f"插件之间存在循环依赖: {remaining}",
+            plugin_name=remaining[0] if remaining else None,
         )
 
     return [name_to_plugin[n] for n in sorted_names]
@@ -234,7 +236,9 @@ class DefaultPluginManager(PluginManager):
         mode = data.get("mode")
         paths = data.get("paths") or ([data.get("path")] if data.get("path") else None)
 
-        logger.info(f"收到插件重载请求: {plugin_name or (mode or 'all')} | paths={paths}")
+        logger.info(
+            f"收到插件重载请求: {plugin_name or (mode or 'all')} | paths={paths}"
+        )
 
         if paths:
             try:
@@ -698,7 +702,9 @@ class DefaultPluginManager(PluginManager):
 
             try:
                 if plugin.protocol_version != PROTOCOL_VERSION:
-                    raise PluginVersionError(f"插件 {plugin.name} 协议版本不兼容", plugin.name)
+                    raise PluginVersionError(
+                        f"插件 {plugin.name} 协议版本不兼容", plugin.name
+                    )
 
                 await self._send_plugin_event("loading", plugin.name, plugin.meta)
 

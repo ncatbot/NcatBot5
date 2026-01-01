@@ -364,9 +364,9 @@ class CacheManager:
             "file_count": file_count,
             "max_size": self.max_size,
             "max_size_formatted": self._format_size(self.max_size),
-            "usage_percentage": (total_size / self.max_size * 100)
-            if self.max_size > 0
-            else 0,
+            "usage_percentage": (
+                (total_size / self.max_size * 100) if self.max_size > 0 else 0
+            ),
             "ttl": self.ttl,
             "ttl_formatted": f"{self.ttl // 3600}h {(self.ttl % 3600) // 60}m",
             "oldest_access": oldest_access,

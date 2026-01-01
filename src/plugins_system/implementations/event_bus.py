@@ -178,7 +178,9 @@ class SimpleEventBus(EventBusBase):
                 results[handler_id] = result
             except asyncio.TimeoutError:
                 logger.warning(f"处理器 {handler_id} 执行超时")
-                results[handler_id] = asyncio.TimeoutError(f"处理器执行超时 ({timeout}s)")
+                results[handler_id] = asyncio.TimeoutError(
+                    f"处理器执行超时 ({timeout}s)"
+                )
             except Exception as e:
                 logger.error(f"处理器 {handler_id} 执行异常: {e}")
                 results[handler_id] = e
@@ -399,7 +401,9 @@ class NonBlockingEventBus(EventBusBase):
                 results[handler_id] = result
             except asyncio.TimeoutError:
                 logger.warning(f"工作线程处理器 {handler_id} 执行超时")
-                results[handler_id] = asyncio.TimeoutError(f"处理器执行超时 ({timeout}s)")
+                results[handler_id] = asyncio.TimeoutError(
+                    f"处理器执行超时 ({timeout}s)"
+                )
             except Exception as e:
                 logger.error(f"工作线程处理器 {handler_id} 执行异常: {e}")
                 results[handler_id] = e

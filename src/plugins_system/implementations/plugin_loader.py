@@ -178,7 +178,9 @@ class DefaultPluginLoader(PluginLoader):
                 return plugins
 
             except ImportError as e:
-                raise PluginValidationError(f"无法从ZIP文件导入模块 {module_name}:\n{e}")
+                raise PluginValidationError(
+                    f"无法从ZIP文件导入模块 {module_name}:\n{e}"
+                )
 
         except Exception:
             zip_path = str(source.path)

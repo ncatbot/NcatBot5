@@ -1,6 +1,7 @@
 """
 连接器，用于与服务提供者连接
 """
+
 from abc import ABC, abstractmethod
 from logging import Logger, getLogger
 from typing import Any, NoReturn
@@ -49,13 +50,10 @@ class BaseWsClient(ABC):
             await client.stop()
 
     @abstractmethod
-    async def on_message(self, data: Any) -> Any:
-        ...
+    async def on_message(self, data: Any) -> Any: ...
 
     @abstractmethod
-    async def on_close(self, data: Any) -> Any:
-        ...
+    async def on_close(self, data: Any) -> Any: ...
 
     @abstractmethod
-    async def on_error(self, data: Any) -> Any:
-        ...
+    async def on_error(self, data: Any) -> Any: ...

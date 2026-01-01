@@ -2,6 +2,7 @@
 Instant Messaging Software Development Kit
 所有快捷操作都委托给 IMClient
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -533,15 +534,17 @@ class Message:
             timestamp=dt.datetime.now(),
             message_type=self.FORWARD,
             group_id=None,  # 转发给用户，所以是私聊
-            forward_info=ForwardInfo(
-                original_message_id=self._id,
-                original_sender_id=self._sender_id,
-                original_timestamp=self._timestamp,
-                original_content=self._content,  # 存储原始消息内容
-                forwarder_id=self._client.protocol.self_id,
-            )
-            if self._id
-            else None,
+            forward_info=(
+                ForwardInfo(
+                    original_message_id=self._id,
+                    original_sender_id=self._sender_id,
+                    original_timestamp=self._timestamp,
+                    original_content=self._content,  # 存储原始消息内容
+                    forwarder_id=self._client.protocol.self_id,
+                )
+                if self._id
+                else None
+            ),
         )
 
         return await self._client.send_private_message(user_id, msg)
@@ -565,15 +568,17 @@ class Message:
             timestamp=dt.datetime.now(),
             message_type=self.FORWARD,
             group_id=group_id,  # 目标群组
-            forward_info=ForwardInfo(
-                original_message_id=self._id,
-                original_sender_id=self._sender_id,
-                original_timestamp=self._timestamp,
-                original_content=self._content,  # 存储原始消息内容
-                forwarder_id=self._client.protocol.self_id,
-            )
-            if self._id
-            else None,
+            forward_info=(
+                ForwardInfo(
+                    original_message_id=self._id,
+                    original_sender_id=self._sender_id,
+                    original_timestamp=self._timestamp,
+                    original_content=self._content,  # 存储原始消息内容
+                    forwarder_id=self._client.protocol.self_id,
+                )
+                if self._id
+                else None
+            ),
         )
 
         return await self._client.send_group_message(group_id, msg)
@@ -667,15 +672,17 @@ class Message:
             timestamp=dt.datetime.now(),
             message_type=cls.FORWARD,
             group_id=group_id,
-            forward_info=ForwardInfo(
-                original_message_id=original_message.id,
-                original_sender_id=original_message.sender_id,
-                original_timestamp=original_message.timestamp,
-                original_content=original_message.content,
-                forwarder_id=forwarder_id,
-            )
-            if original_message.id
-            else None,
+            forward_info=(
+                ForwardInfo(
+                    original_message_id=original_message.id,
+                    original_sender_id=original_message.sender_id,
+                    original_timestamp=original_message.timestamp,
+                    original_content=original_message.content,
+                    forwarder_id=forwarder_id,
+                )
+                if original_message.id
+                else None
+            ),
         )
 
 
