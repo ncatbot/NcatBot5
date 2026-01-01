@@ -17,7 +17,7 @@ class Text(BaseNode):
     text: str
     _node_type: str = "text"
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         return self.text
 
 
@@ -32,10 +32,7 @@ class Face(BaseNode):
     def __post_init__(self):
         self.id = str(self.id)
 
-    def get_summary(self) -> str:
-        return self.face_text
-
-    def __str__(self):
+    def __str__(self) -> str:
         return self.face_text
 
 
@@ -72,7 +69,7 @@ class Image(DownloadableNode):
     def is_animated_image(self) -> bool:
         return self.sub_type == 1
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         return self.summary
 
 
@@ -82,7 +79,7 @@ class File(DownloadableNode):
 
     _node_type: str = "file"
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         return f"[文件]{self.file_name or ''}"
 
 
@@ -92,7 +89,7 @@ class Record(DownloadableNode):
 
     _node_type: str = "record"
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         return "[语音]"
 
 
@@ -102,7 +99,7 @@ class Video(DownloadableNode):
 
     _node_type: str = "video"
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         return "[视频]"
 
 
@@ -119,6 +116,9 @@ class At(BaseNode):
     def __post_init__(self):
         self.qq = str(self.qq)
 
+    def __str__(self) -> str:
+        return "@{qq}".format(qq=self.qq)
+
 
 @dataclass
 class AtAll(At):
@@ -127,7 +127,7 @@ class AtAll(At):
     qq: str = field(default="all")
 
     def __str__(self) -> str:
-        return "AtAll()"
+        return "@ALL"
 
 
 @dataclass
@@ -245,10 +245,10 @@ class Node(BaseNode):
     def __post_init__(self):
         self.user_id = str(self.user_id)
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         if self.content:
             content_summary = "".join(
-                msg.get_summary() if hasattr(msg, "get_summary") else str(msg)
+                msg.__str__() if hasattr(msg, "__str__") else str(msg)
                 for msg in self.content
             )
             return f"{self.nickname}: {content_summary}"
@@ -268,7 +268,7 @@ class Forward(BaseNode):
         if self.id is not None:
             self.id = str(self.id)
 
-    def get_summary(self) -> str:
+    def __str__(self) -> str:
         return "[聊天记录]"
 
 

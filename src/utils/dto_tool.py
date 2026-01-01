@@ -266,7 +266,13 @@ def _add_type_checking(cls, strict: bool):
                 if field_name in type_hints:
                     expected_type = type_hints[field_name]
                     try:
-                        _check_type_and_value(field_value, expected_type, field_name)
+                        converted = _try_convert_value(
+                            field_value, expected_type, field_name
+                        )
+                        # 如果转换后值不同，更新属性
+                        if converted is not field_value:
+                            object.__setattr__(self, field_name, converted)
+                        _check_type_and_value(converted, expected_type, field_name)
                     except TypeError as e:
                         raise TypeError(f"In {cls.__name__}.__init__: {e}") from e
 
@@ -286,9 +292,12 @@ def _add_type_checking(cls, strict: bool):
             if name in type_hints:
                 expected_type = type_hints[name]
                 try:
-                    _check_type_and_value(value, expected_type, name)
+                    converted = _try_convert_value(value, expected_type, name)
                 except TypeError as e:
                     raise TypeError(f"In {cls.__name__}.{name}: {e}") from e
+                except ValueError as e:
+                    raise ValueError(f"In {cls.__name__}.{name}: {e}") from e
+                value = converted
 
             # 调用原始__setattr__
             object.__setattr__(self, name, value)
@@ -431,6 +440,268 @@ def _check_type_and_value(value, expected_type, name: str = ""):
         )
 
 
+def _try_convert_value(value, expected_type, name: str = ""):
+    """
+    尝试将 value 转换为 expected_type，如果无法转换则抛出 TypeError/ValueError 或返回原始值
+    """
+    # 特殊标记和 Any 不转换
+    if value is dataclasses.MISSING or (
+        hasattr(value, "__class__") and value.__class__.__name__ == "_MISSING_TYPE"
+    ):
+        return value
+
+    if expected_type is Any:
+        return value
+
+    origin = get_origin(expected_type)
+
+    # Union / Optional
+    if origin is Union:
+        for arg in get_args(expected_type):
+            if arg is type(None) and value is None:
+                return None
+        last_exc = None
+        for arg in get_args(expected_type):
+            if arg is type(None):
+                continue
+            try:
+                return _try_convert_value(value, arg, name)
+            except Exception as e:
+                last_exc = e
+                continue
+        if last_exc is not None:
+            raise last_exc
+        raise TypeError(
+            f"Field '{name}' expects one of {get_args(expected_type)}, got {type(value).__name__}"
+        )
+
+    # 容器类型：list, dict, set, tuple
+    if origin in (list, List):
+        if not isinstance(value, list):
+            # 尝试从 JSON 字符串解析
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        value = parsed
+                    else:
+                        raise TypeError(
+                            f"Field '{name}' expects list, got {type(value).__name__}"
+                        )
+                except json.JSONDecodeError:
+                    raise TypeError(
+                        f"Field '{name}' expects list, got {type(value).__name__}"
+                    )
+            else:
+                raise TypeError(
+                    f"Field '{name}' expects list, got {type(value).__name__}"
+                )
+
+        if get_args(expected_type):
+            item_type = get_args(expected_type)[0]
+            converted = []
+            for i, item in enumerate(value):
+                converted.append(_try_convert_value(item, item_type, f"{name}[{i}]"))
+            return converted
+        return value
+
+    if origin in (dict, Dict):
+        if not isinstance(value, dict):
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, dict):
+                        value = parsed
+                    else:
+                        raise TypeError(
+                            f"Field '{name}' expects dict, got {type(value).__name__}"
+                        )
+                except json.JSONDecodeError:
+                    raise TypeError(
+                        f"Field '{name}' expects dict, got {type(value).__name__}"
+                    )
+            else:
+                raise TypeError(
+                    f"Field '{name}' expects dict, got {type(value).__name__}"
+                )
+
+        args = get_args(expected_type)
+        if len(args) >= 2:
+            key_type, val_type = args[:2]
+            converted = {}
+            for k, v in value.items():
+                new_k = _try_convert_value(k, key_type, f"{name}.key")
+                new_v = _try_convert_value(v, val_type, f"{name}[{k!r}]")
+                converted[new_k] = new_v
+            return converted
+        return value
+
+    if origin in (set, Set):
+        if not isinstance(value, set):
+            if isinstance(value, (list, tuple)):
+                value = set(value)
+            elif isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        value = set(parsed)
+                    else:
+                        raise TypeError(
+                            f"Field '{name}' expects set, got {type(value).__name__}"
+                        )
+                except json.JSONDecodeError:
+                    raise TypeError(
+                        f"Field '{name}' expects set, got {type(value).__name__}"
+                    )
+            else:
+                raise TypeError(
+                    f"Field '{name}' expects set, got {type(value).__name__}"
+                )
+
+        if get_args(expected_type):
+            item_type = get_args(expected_type)[0]
+            return {
+                _try_convert_value(item, item_type, f"{name}.item") for item in value
+            }
+        return value
+
+    if origin in (tuple, Tuple):
+        if not isinstance(value, tuple):
+            if isinstance(value, (list, str)):
+                try:
+                    if isinstance(value, str):
+                        parsed = json.loads(value)
+                        if isinstance(parsed, list):
+                            value = tuple(parsed)
+                        else:
+                            raise TypeError(
+                                f"Field '{name}' expects tuple, got {type(value).__name__}"
+                            )
+                    else:
+                        value = tuple(value)
+                except json.JSONDecodeError:
+                    raise TypeError(
+                        f"Field '{name}' expects tuple, got {type(value).__name__}"
+                    )
+            else:
+                raise TypeError(
+                    f"Field '{name}' expects tuple, got {type(value).__name__}"
+                )
+
+        args = get_args(expected_type)
+        if args:
+            if len(args) != len(value):
+                raise TypeError(
+                    f"Field '{name}' expects tuple of length {len(args)}, "
+                    f"got {len(value)}"
+                )
+            converted = []
+            for i, (item, item_type) in enumerate(zip(value, args)):
+                converted.append(_try_convert_value(item, item_type, f"{name}[{i}]"))
+            return tuple(converted)
+        return value
+
+    # dataclass 类型
+    if inspect.isclass(expected_type) and dataclasses.is_dataclass(expected_type):
+        if isinstance(value, dict):
+            # 支持 DTO 的 from_dict
+            if hasattr(expected_type, "from_dict"):
+                return expected_type.from_dict(value, strict=False)
+        return value
+
+    # 自定义字符串类型（Email, URL 等）或普通 str
+    if inspect.isclass(expected_type) and issubclass(expected_type, str):
+        if isinstance(value, expected_type):
+            return value
+        if not isinstance(value, str):
+            # 尝试 str() 转换
+            value = str(value)
+        # 让类型自己验证和构造
+        return expected_type(value)
+
+    # UUID 类型
+    if expected_type is UUID:
+        if isinstance(value, UUID):
+            return value
+        if isinstance(value, str):
+            try:
+                return UUID(value)
+            except Exception as e:
+                raise ValueError(f"Field '{name}' has invalid UUID: {e}") from e
+
+    # datetime / date
+    if expected_type is datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except Exception as e:
+                raise ValueError(f"Field '{name}' has invalid datetime: {e}") from e
+    if expected_type is date:
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except Exception as e:
+                raise ValueError(f"Field '{name}' has invalid date: {e}") from e
+
+    # Decimal
+    if expected_type is Decimal:
+        if isinstance(value, Decimal):
+            return value
+        try:
+            return Decimal(str(value))
+        except Exception as e:
+            raise ValueError(f"Field '{name}' has invalid Decimal: {e}") from e
+
+    # bool
+    if expected_type is bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            v = value.strip().lower()
+            if v in ("true", "1", "yes", "y", "t"):
+                return True
+            if v in ("false", "0", "no", "n", "f"):
+                return False
+            raise ValueError(f"Field '{name}' has invalid boolean: {value}")
+        if isinstance(value, (int, float)):
+            return bool(value)
+
+    # int
+    if expected_type is int:
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            try:
+                return int(value)
+            except Exception as e:
+                raise ValueError(f"Field '{name}' has invalid int: {e}") from e
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+
+    # float
+    if expected_type is float:
+        if isinstance(value, float):
+            return value
+        if isinstance(value, (int, str)):
+            try:
+                return float(value)
+            except Exception as e:
+                raise ValueError(f"Field '{name}' has invalid float: {e}") from e
+
+    # 最后，如果已经是期望类型就返回原值
+    if isinstance(value, expected_type):
+        return value
+
+    # 无法转换，直接抛错
+    raise TypeError(
+        f"Field '{name}' expects {expected_type}, got {type(value).__name__}"
+    )
+
+
 # ========== DTO功能 ==========
 
 
@@ -480,16 +751,20 @@ def _add_dto_features(cls):
                 result[field.name] = value.to_dict(exclude_none, exclude_unset)
             elif isinstance(value, list):
                 result[field.name] = [
-                    item.to_dict(exclude_none, exclude_unset)
-                    if dataclasses.is_dataclass(item)
-                    else item
+                    (
+                        item.to_dict(exclude_none, exclude_unset)
+                        if dataclasses.is_dataclass(item)
+                        else item
+                    )
                     for item in value
                 ]
             elif isinstance(value, dict):
                 result[field.name] = {
-                    k: v.to_dict(exclude_none, exclude_unset)
-                    if dataclasses.is_dataclass(v)
-                    else v
+                    k: (
+                        v.to_dict(exclude_none, exclude_unset)
+                        if dataclasses.is_dataclass(v)
+                        else v
+                    )
                     for k, v in value.items()
                 }
             else:
@@ -541,7 +816,7 @@ def _add_dto_features(cls):
             raise TypeError(f"Expected dict, got {type(data).__name__}")
 
         processed_data = {}
-        # type_hints = getattr(cls, "_type_hints", {})
+        type_hints = getattr(cls, "_type_hints", {})
 
         for field in dataclasses.fields(cls):
             field_name = field.name
@@ -556,6 +831,13 @@ def _add_dto_features(cls):
                 continue
 
             value = data[field_name]
+            if field_name in type_hints:
+                expected_type = type_hints[field_name]
+                try:
+                    value = _try_convert_value(value, expected_type, field_name)
+                except (TypeError, ValueError) as e:
+                    if strict:
+                        raise e
             processed_data[field_name] = value
 
         return cls(**processed_data)

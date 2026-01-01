@@ -41,7 +41,7 @@ class NapcatProtocol(ProtocolABC):
     async def send_group_message(self, gid: GroupID, content: Message) -> RawMessage:
         """发送群消息"""
         # 将 Message 转换为 napcat 的消息格式
-        self._print_message(Event(event="message.group", data=content))
+        await self._print_message(Event(event="message.group", data=content))
         message_segments = self._content_to_segments(content)
 
         # 调用 API 发送
@@ -53,7 +53,7 @@ class NapcatProtocol(ProtocolABC):
 
     async def send_private_message(self, uid: UserID, content: Message) -> RawMessage:
         """发送私聊消息"""
-        self._print_message(Event(event="message.private", data=content))
+        await self._print_message(Event(event="message.private", data=content))
         # 将 Message 转换为 napcat 的消息格式
         message_segments = self._content_to_segments(content)
 
@@ -182,7 +182,8 @@ class NapcatProtocol(ProtocolABC):
             group_id=str(raw["group_id"]) if raw.get("group_id") else None,
             raw=raw,
         )
-        msg._sender_cache = self._parse_user(raw.get("sender"))
+        if "sender" in raw:
+            msg._sender_cache = self._parse_user(raw.get("sender"))
 
         return msg
 
@@ -193,7 +194,7 @@ class NapcatProtocol(ProtocolABC):
             last_active=dt.datetime.now(),
         )
         return User(
-            uid=str(raw.get("user_id")),
+            uid=str(raw["user_id"]) if raw.get("user_id") else None,
             nickname=raw.get("nickname"),
             role=raw.get("role"),
             group_name=raw.get("card") or raw.get("nickname"),
@@ -543,7 +544,9 @@ class NapcatProtocol(ProtocolABC):
                 logger.info("[私聊撤回] 好友 %s 撤回消息 %s", n.user_id, n.message_id)
 
             case "notice.notify.poke":
-                logger.info("[戳一戳] 群 %s | %s → %s", n.group_id, n.user_id, n.target_id)
+                logger.info(
+                    "[戳一戳] 群 %s | %s → %s", n.group_id, n.user_id, n.target_id
+                )
 
             case "notice.notify.lucky_king":
                 logger.info("[红包运气王] 群 %s → %s", n.group_id, n.target_id)
@@ -563,7 +566,10 @@ class NapcatProtocol(ProtocolABC):
         match event.event:
             case "request.friend":
                 logger.info(
-                    "[加好友请求] %s 申请：%s（flag=%s）", r.user_id, r.comment or "", flag
+                    "[加好友请求] %s 申请：%s（flag=%s）",
+                    r.user_id,
+                    r.comment or "",
+                    flag,
                 )
             case "request.group":
                 logger.info(

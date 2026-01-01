@@ -40,10 +40,6 @@ class BaseNode(MessageNode):
 
         return {"type": self.node_type, "data": data}
 
-    def get_summary(self) -> str:
-        """获取节点摘要，子类可覆写"""
-        return f"[{self._node_type}]"
-
     @classmethod
     def from_dto(cls, data: "BaseDto") -> "BaseNode":
         data_dict = data.to_dict()
@@ -51,4 +47,4 @@ class BaseNode(MessageNode):
         return cls(**data_dict)
 
     def __str__(self):
-        return self.get_summary()
+        return f"[{self._node_type}]"
