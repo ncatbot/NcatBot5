@@ -12,6 +12,7 @@ class SDKError(Exception):
             message: 异常消息
             plugin_name: 相关的插件名称
         """
+        self.message = message
         super().__init__(message)
 
     def add_note(self, note: str) -> None:
@@ -22,3 +23,6 @@ class SDKError(Exception):
         """
         if hasattr(super(), "add_note"):
             super().add_note(note)
+
+    def __str__(self):
+        return self.message

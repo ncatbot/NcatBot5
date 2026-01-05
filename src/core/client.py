@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from ..abc.api_base import APIBase as APIBase
     from .IM import Group, Me, Message, User
 
+from src.exceptions.parse import ParseError
+
 from ..abc.protocol_abc import APIBaseT, MessageBuilderT, ProtocolABC
 from ..utils.typec import GroupID, MsgId, UserID
 
@@ -43,7 +45,7 @@ class IMClient(Generic[APIBaseT]):
     通过类方法获取当前实例
     """
 
-    _instance: Optional["IMClient"] = None
+    _instance: Optional[Self] = None
     _lock = threading.Lock()
     _initialized = False
 
@@ -65,14 +67,14 @@ class IMClient(Generic[APIBaseT]):
                 return
 
             # 保存协议实例
-            self._protocol = protocol
+            self._protocol: ProtocolABC = protocol
             self._me: Optional["Me"] = None
             self._initialized = True
 
             log.debug(f"IMClient 初始化完成，使用协议: {self.protocol_name}")
 
     @classmethod
-    def get_current(cls) -> Optional[Self]:
+    def get_current(cls) -> Self:
         """获取当前IMClient实例"""
         if not cls._instance:
             raise ValueError("IMClient尚未初始化")
@@ -126,7 +128,12 @@ class IMClient(Generic[APIBaseT]):
     ) -> "Message":
         """发送群消息"""
         response = await self.protocol.send_group_message(group_id, msg)
-        return self.protocol._parse_message(response)
+        try:
+            return self.protocol._parse_message(response)
+        except Exception as e:
+            err = ParseError(self.protocol.protocol_name, "parse_message", response)
+            log.error(str(err))
+            raise err from e
 
     async def send_private_message(
         self,
@@ -135,7 +142,12 @@ class IMClient(Generic[APIBaseT]):
     ) -> "Message":
         """发送私聊消息"""
         response = await self.protocol.send_private_message(user_id, msg)
-        return self.protocol._parse_message(response)
+        try:
+            return self.protocol._parse_message(response)
+        except Exception as e:
+            err = ParseError(self.protocol.protocol_name, "解析消息", response)
+            log.error(str(err))
+            raise err from e
 
     async def recall_message(self, msg_id: MsgId) -> bool:
         """撤回消息"""
@@ -144,12 +156,22 @@ class IMClient(Generic[APIBaseT]):
     async def get_message(self, msg_id: MsgId) -> "Message":
         """获取消息对象"""
         response = await self.protocol.fetch_message(msg_id)
-        return self.protocol._parse_message(response)
+        try:
+            return self.protocol._parse_message(response)
+        except Exception as e:
+            err = ParseError(self.protocol.protocol_name, "解析消息", response)
+            log.error(str(err))
+            raise err from e
 
     async def get_user(self, user_id: UserID) -> "User":
         """获取用户对象"""
         response = await self.protocol.fetch_user(user_id)
-        return self.protocol._parse_user(response)
+        try:
+            return self.protocol._parse_user(response)
+        except Exception as e:
+            err = ParseError(self.protocol.protocol_name, "解析用户数据", response)
+            log.error(str(err))
+            raise err from e
 
     async def get_user_info(self, user_id: UserID) -> Dict[str, Any]:
         """获取用户详细信息"""
@@ -171,14 +193,24 @@ class IMClient(Generic[APIBaseT]):
 
         users = []
         for user_data in response:
-            users.append(self.protocol._parse_user(user_data))
+            try:
+                users.append(self.protocol._parse_user(user_data))
+            except Exception as e:
+                err = ParseError(self.protocol.protocol_name, "解析用户数据", response)
+                log.error(str(err))
+                raise err from e
 
         return users
 
     async def get_group(self, group_id: GroupID) -> "Group":
         """获取群组对象"""
         response = await self.protocol.fetch_group(group_id)
-        return self.protocol._parse_group(response)
+        try:
+            return self.protocol._parse_group(response)
+        except Exception as e:
+            err = ParseError(self.protocol.protocol_name, "解析群数据", response)
+            log.error(str(err))
+            raise err from e
 
     async def get_group_info(self, group_id: GroupID) -> Dict[str, Any]:
         """获取群组详细信息"""
@@ -199,7 +231,12 @@ class IMClient(Generic[APIBaseT]):
 
         groups = []
         for group_data in response:
-            groups.append(self.protocol._parse_group(group_data))
+            try:
+                groups.append(self.protocol._parse_group(group_data))
+            except Exception as e:
+                err = ParseError(self.protocol.protocol_name, "解析群数据", response)
+                log.error(str(err))
+                raise err from e
 
         return groups
 
@@ -209,7 +246,12 @@ class IMClient(Generic[APIBaseT]):
 
         users = []
         for user_data in response:
-            users.append(self.protocol._parse_user(user_data))
+            try:
+                users.append(self.protocol._parse_user(user_data))
+            except Exception as e:
+                err = ParseError(self.protocol.protocol_name, "解析用户数据", response)
+                log.error(str(err))
+                raise err from e
 
         return users
 
@@ -257,7 +299,12 @@ class IMClient(Generic[APIBaseT]):
     ) -> "Group":
         """创建群组"""
         response = await self.protocol.create_group(name, initial_members or [])
-        return self.protocol._parse_group(response)
+        try:
+            return self.protocol._parse_group(response)
+        except Exception as e:
+            err = ParseError(self.protocol.protocol_name, "解析群数据", response)
+            log.error(str(err))
+            raise err from e
 
     # @unsupported_warning
     async def set_group_admin(
