@@ -11,7 +11,10 @@ RBAC（Role-Based Access Control）权限系统
 
 import json
 import re
+from logging import getLogger
 from typing import Any, Dict, List, Optional, Set
+
+logger = getLogger("RBAC")
 
 
 # ------------------------------------------------------
@@ -164,7 +167,7 @@ class RBACManager:
         data = self.to_dict()
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        print(f"已成功保存 RBAC 数据到 {filepath}")
+        # print(f"已成功保存 RBAC 数据到 {filepath}")
 
     # --------------------------------------------------
     # 类方法：从文件重建整个系统

@@ -11,6 +11,10 @@ class DemoSer(PluginBase, ServiceMixin):
     async def on_load(self):
         # self.register_service(ServiceName("demo_service"), self.bili_ck, event_mod=False)
         self.logger.info("Service started")
+        if "loaded" in self.config:
+            self.config["loaded"] += 1
+        else:
+            self.config["loaded"] = 1
         # await User("3123651157").send_text("DemoSer_plugin loaded successfully")
 
     @online_service("demo_service", event_mod=False)
