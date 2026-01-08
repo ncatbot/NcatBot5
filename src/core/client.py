@@ -2,6 +2,8 @@
 """
 IM客户端
 """
+from __future__ import annotations
+
 import logging
 import threading
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Self
@@ -86,6 +88,30 @@ class IMClient(Generic[APIBaseT]):
     def load_rbac_tree(cls, file: str):
         """加载RBAC树"""
         cls._rbac_manager.load_from_file(file)
+        rbac = cls._rbac_manager
+        """权限结构
+        Default
+        User: Default
+        Group: User
+        Admin: User
+        Owner: Admin
+        """
+        root_role = {
+            "Default": (),  # 所有实体的默认权限
+            "User": ("Default",),  # 用户的权限
+            "Group": ("User",),  # 群成员的权限
+            "Admin": ("User",),  # 管理员的权限
+            "Owner": ("Admin",),  # 所有者的权限
+            # "Neko": ("Owner")         # 可爱猫娘的权限  可爱的猫娘总是有特权, 不是吗
+        }
+        for role_name, parents in root_role.items():
+            role = rbac.get_role(role_name)
+            if not role:
+                role = rbac.create_role(role_name)
+            if role is None:  # 理论上不会, 但猫娘会保护你的
+                raise RuntimeError(f"角色 {role_name} 未成功创建")
+            for parent in parents:
+                role.inherit_from(rbac.get_role(parent))
 
     @classmethod
     def save_rbac_tree(cls, file: str):

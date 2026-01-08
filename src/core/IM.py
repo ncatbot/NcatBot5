@@ -23,6 +23,9 @@ from typing import (
     Union,
 )
 
+from src.core.rabc import RBACManager
+from src.core.rabc import User as RBACUser
+
 if TYPE_CHECKING:
     from .client import IMClient
 
@@ -691,6 +694,7 @@ class Message:
 # TODO 完善检查
 class User:
     _client: Optional["IMClient"] = None
+    rbac: Optional["RBACManager"] = IMClient.get_rbac()
 
     def __init__(
         self,
@@ -749,11 +753,15 @@ class User:
         return self._uid
 
     @property
+    def id(self) -> str:
+        return f"U{self._uid}"
+
+    @property
     def role(self) -> Optional[str]:
         return self._role
 
     @property
-    def group_name(self) -> Optional[str]:
+    def group_id(self) -> Optional[str]:
         return self._group_id
 
     @property
@@ -768,6 +776,31 @@ class User:
     def is_full(self) -> bool:
         """是否为完整协议实例"""
         return self._is_full
+
+    @property
+    def rbac_user(self) -> RBACUser:
+        """获取对应的 RBAC User 实例"""
+        user = self.rbac.get_user(self.id)
+        if not user:
+            user = self.rbac.create_user(self.id)
+        return user
+
+    # RBAC 相关
+    def permit(self, p: str) -> None:
+        user = self.rbac_user
+        user.permit(p)
+
+    def deny(self, p: str) -> None:
+        user = self.rbac_user
+        user.deny(p)
+
+    def can(self, perm_str: str) -> bool:
+        user = self.rbac_user
+        group = Group(self._group_id) if self._group_id else None
+        if group:
+            return RBACUser.quick_can(user, perm_str, group.role)
+        else:
+            return user.can(perm_str)
 
     # 快捷私聊
     async def send_text(self, text: str) -> Message:
@@ -855,9 +888,17 @@ class User:
         self._is_full = True
         return self
 
+    @dataclass
+    async def user(cls, user: UserID) -> "User":
+        """快捷方法，通过用户ID获取完整 User 实例"""
+        return await User(
+            uid=user,
+        ).build()
+
 
 class Group:
     _client: Optional["IMClient"] = None
+    rbac: Optional["RBACManager"] = IMClient.get_rbac()
 
     def __init__(
         self,
@@ -913,6 +954,18 @@ class Group:
     @property
     def gid(self) -> GroupID:
         return self._gid
+
+    @property
+    def id(self) -> str:
+        return f"G{self._gid}"
+
+    @property
+    def role(self):
+        rbac = self.rbac
+        role = rbac.get_role(self.id)
+        if not role:
+            role = rbac.create_role(self.id)
+        return role
 
     @property
     def name(self) -> str:
@@ -1056,6 +1109,13 @@ class Group:
             return file
         return None
 
+    @dataclass
+    async def group(cls, group: GroupID) -> "Group":
+        """快捷方法，通过群组ID获取完整 Group 实例"""
+        return await Group(
+            gid=group,
+        ).build()
+
 
 class Me(User):
     """当前登录用户"""
@@ -1065,10 +1125,6 @@ class Me(User):
 
     def __init__(self, *_):
         pass
-
-    @property
-    def uid(self) -> UserID:
-        return self._client.protocol.self_id
 
     @classmethod
     def from_user(cls, user: User) -> "Me":
