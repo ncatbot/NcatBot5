@@ -7,6 +7,7 @@ RBAC（Role-Based Access Control）权限系统
 3. 用户黑白名单
 4. JSON 持久化与恢复
 5. 权限树可视化
+6. 线程安全支持
 """
 from __future__ import annotations
 
@@ -14,13 +15,14 @@ import json
 import logging
 import re
 import sys
+import threading
 from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger("RBAC")
 
 
 # ------------------------------------------------------
-# 权限匹配器：支持三种模式
+# 权限匹配器：支持三种模式（线程安全，无状态）
 # 1. 显式字符串        system.config
 # 2. 通配符            *.config  /  **.log
 # 3. 正则表达式        [regex_here]
@@ -56,16 +58,28 @@ class PermissionMatcher:
 
 
 # ------------------------------------------------------
-# 管理器：集中管理所有角色与用户
+# 管理器：集中管理所有角色与用户（线程安全）
 # ------------------------------------------------------
 class RBACManager:
     def __init__(self, name: str = "default") -> None:
         self.name: str = name
+        self._lock: threading.RLock = threading.RLock()  # 可重入锁，用于线程安全
         self._users: Dict[str, "User"] = {}
         self._roles: Dict[str, "Role"] = {}
         logger.debug("RBAC管理器<%s> 已创建", name)
 
+    # ---------- 线程安全装饰器 ----------
+    def _thread_safe(func):
+        """装饰器：确保方法在锁的保护下执行"""
+
+        def wrapper(self, *args, **kwargs):
+            with self._lock:
+                return func(self, *args, **kwargs)
+
+        return wrapper
+
     # ---------- 快捷创建 ----------
+    @_thread_safe
     def create_user(self, username: str) -> "User":
         if username in self._users:
             raise ValueError(f"用户<{username}> 已存在（禁止覆盖）")
@@ -74,6 +88,7 @@ class RBACManager:
         logger.info("用户<%s> 已创建", username)
         return user
 
+    @_thread_safe
     def create_role(self, rolename: str) -> "Role":
         if rolename in self._roles:
             raise ValueError(f"角色<{rolename}> 已存在（禁止覆盖）")
@@ -83,6 +98,7 @@ class RBACManager:
         return role
 
     # -------------- 显式删除 --------------
+    @_thread_safe
     def delete_user(self, username: str) -> None:
         """
         删除用户，若不存在抛 KeyError。
@@ -99,6 +115,7 @@ class RBACManager:
         del self._users[username]
         logger.info("用户<%s> 已删除", username)
 
+    @_thread_safe
     def delete_role(self, rolename: str) -> None:
         """
         删除角色，若不存在抛 KeyError。
@@ -122,15 +139,18 @@ class RBACManager:
         logger.info("角色<%s> 已删除", rolename)
 
     # ---------- 快捷查找 ----------
+    @_thread_safe
     def get_user(self, name: str) -> Optional["User"]:
         return self._users.get(name)
 
+    @_thread_safe
     def get_role(self, name: str) -> Optional["Role"]:
         return self._roles.get(name)
 
     # --------------------------------------------------
     # 序列化：把当前整个系统压成纯字典，方便 JSON 保存
     # --------------------------------------------------
+    @_thread_safe
     def to_dict(self) -> Dict[str, Any]:
         return {
             "manager_name": self.name,
@@ -156,6 +176,7 @@ class RBACManager:
     # --------------------------------------------------
     # 保存到文件
     # --------------------------------------------------
+    @_thread_safe
     def save_to_file(self, filepath: str) -> None:
         data = self.to_dict()
         with open(filepath, "w", encoding="utf-8") as f:
@@ -221,9 +242,13 @@ class ManagedEntity:
         if self._manager is not other._manager:
             raise RuntimeError("安全错误：不允许跨管理器交互！")
 
+    def _acquire_lock(self):
+        """获取管理器的锁，用于线程同步"""
+        return self._manager._lock
+
 
 # ------------------------------------------------------
-# 角色：拥有权限 + 可继承父角色
+# 角色：拥有权限 + 可继承父角色（线程安全）
 # ------------------------------------------------------
 class Role(ManagedEntity):
     def __init__(self, manager: RBACManager, name: str) -> None:
@@ -233,63 +258,67 @@ class Role(ManagedEntity):
         self._parents: Set["Role"] = set()
 
     def add_permission(self, perm_str: str) -> None:
-        self._permissions.add(perm_str)
-        logger.info("角色<%s> 添加权限: %r", self.name, perm_str)
+        with self._acquire_lock():
+            self._permissions.add(perm_str)
+            logger.info("角色<%s> 添加权限: %r", self.name, perm_str)
 
     def inherit_from(self, parent_role: "Role") -> None:
-        self._check_manager_compatibility(parent_role)
-        self._parents.add(parent_role)
-        logger.info("角色<%s> 继承自角色<%s>", self.name, parent_role.name)
+        with self._acquire_lock():
+            self._check_manager_compatibility(parent_role)
+            self._parents.add(parent_role)
+            logger.info("角色<%s> 继承自角色<%s>", self.name, parent_role.name)
 
     def has_permission(
         self, perm_str: str, checked_roles: Optional[Set["Role"]] = None
     ) -> bool:
-        if checked_roles is None:
-            _checked_roles: Set["Role"] = set()
-        else:
-            _checked_roles = checked_roles
+        with self._acquire_lock():
+            if checked_roles is None:
+                _checked_roles: Set["Role"] = set()
+            else:
+                _checked_roles = checked_roles
 
-        if self in _checked_roles:
+            if self in _checked_roles:
+                return False
+            _checked_roles.add(self)
+
+            # 先看自身权限
+            for p in self._permissions:
+                if PermissionMatcher.match(p, perm_str):
+                    logger.debug("角色<%s> 自身权限匹配: %r", self.name, perm_str)
+                    return True
+            # 再看父角色
+            for parent in self._parents:
+                if parent.has_permission(perm_str, _checked_roles):
+                    logger.debug(
+                        "角色<%s> 通过父角色<%s> 继承匹配权限: %r",
+                        self.name,
+                        parent.name,
+                        perm_str,
+                    )
+                    return True
+            logger.debug("角色<%s> 缺少权限: %r", self.name, perm_str)
             return False
-        _checked_roles.add(self)
-
-        # 先看自身权限
-        for p in self._permissions:
-            if PermissionMatcher.match(p, perm_str):
-                logger.debug("角色<%s> 自身权限匹配: %r", self.name, perm_str)
-                return True
-        # 再看父角色
-        for parent in self._parents:
-            if parent.has_permission(perm_str, _checked_roles):
-                logger.debug(
-                    "角色<%s> 通过父角色<%s> 继承匹配权限: %r",
-                    self.name,
-                    parent.name,
-                    perm_str,
-                )
-                return True
-        logger.debug("角色<%s> 缺少权限: %r", self.name, perm_str)
-        return False
 
     def get_permission_tree(self) -> Dict[str, Any]:
-        tree: Dict[str, Any] = {}
-        for perm in self._permissions:
-            parts = (
-                [perm]
-                if (perm.startswith("[") and perm.endswith("]"))
-                else perm.split(".")
-            )
-            curr = tree
-            for part in parts:
-                if part not in curr:
-                    curr[part] = {}
-                curr = curr[part]
-        logger.debug("角色<%s> 权限树: %s", self.name, tree)
-        return tree
+        with self._acquire_lock():
+            tree: Dict[str, Any] = {}
+            for perm in self._permissions:
+                parts = (
+                    [perm]
+                    if (perm.startswith("[") and perm.endswith("]"))
+                    else perm.split(".")
+                )
+                curr = tree
+                for part in parts:
+                    if part not in curr:
+                        curr[part] = {}
+                    curr = curr[part]
+            logger.debug("角色<%s> 权限树: %s", self.name, tree)
+            return tree
 
 
 # ------------------------------------------------------
-# 用户：绑定角色 + 黑白名单
+# 用户：绑定角色 + 黑白名单（线程安全）
 # 权限判断顺序：黑名单 > 白名单 > 角色
 # ------------------------------------------------------
 class User(ManagedEntity):
@@ -302,90 +331,155 @@ class User(ManagedEntity):
         logger.info("用户<%s> 已创建", name)
 
     def add_role(self, role: Role) -> None:
-        self._check_manager_compatibility(role)
-        self._roles.add(role)
-        logger.info("用户<%s> 添加角色<%s>", self.name, role.name)
+        with self._acquire_lock():
+            self._check_manager_compatibility(role)
+            self._roles.add(role)
+            logger.info("用户<%s> 添加角色<%s>", self.name, role.name)
 
     def permit(self, p: str) -> None:
-        self._whitelist.add(p)
-        logger.info("用户<%s> 白名单添加: %r", self.name, p)
+        with self._acquire_lock():
+            self._whitelist.add(p)
+            logger.info("用户<%s> 白名单添加: %r", self.name, p)
 
     def deny(self, p: str) -> None:
-        self._blacklist.add(p)
-        logger.info("用户<%s> 黑名单添加: %r", self.name, p)
+        with self._acquire_lock():
+            self._blacklist.add(p)
+            logger.info("用户<%s> 黑名单添加: %r", self.name, p)
 
     def can(self, perm_str: str) -> bool:
-        logger.debug("用户<%s> 检查权限: %r", self.name, perm_str)
-        # 1. 黑名单一票否决
-        for p in self._blacklist:
-            if PermissionMatcher.match(p, perm_str):
-                logger.warning("用户<%s> 权限被黑名单拒绝: 模式=%r", self.name, p)
-                return False
-        # 2. 白名单直接通过
-        for p in self._whitelist:
-            if PermissionMatcher.match(p, perm_str):
-                logger.debug("用户<%s> 权限被白名单允许: 模式=%r", self.name, p)
-                return True
-        # 3. 遍历所有绑定角色（含继承）
-        checked: Set[Role] = set()
-        for r in self._roles:
-            if r not in checked and r.has_permission(perm_str):
-                logger.debug("用户<%s> 权限通过角色<%s> 允许", self.name, r.name)
-                return True
-            checked.add(r)
-        logger.warning("用户<%s> 权限最终拒绝: %r", self.name, perm_str)
-        return False
+        with self._acquire_lock():
+            logger.debug("用户<%s> 检查权限: %r", self.name, perm_str)
+            # 1. 黑名单一票否决
+            for p in self._blacklist:
+                if PermissionMatcher.match(p, perm_str):
+                    logger.warning("用户<%s> 权限被黑名单拒绝: 模式=%r", self.name, p)
+                    return False
+            # 2. 白名单直接通过
+            for p in self._whitelist:
+                if PermissionMatcher.match(p, perm_str):
+                    logger.debug("用户<%s> 权限被白名单允许: 模式=%r", self.name, p)
+                    return True
+            # 3. 遍历所有绑定角色（含继承）
+            checked: Set[Role] = set()
+            for r in self._roles:
+                if r not in checked and r.has_permission(perm_str):
+                    logger.debug("用户<%s> 权限通过角色<%s> 允许", self.name, r.name)
+                    return True
+                checked.add(r)
+            logger.warning("用户<%s> 权限最终拒绝: %r", self.name, perm_str)
+            return False
 
     @classmethod
     def quick_can(cls, user: "User", perm: str, *extra: "Role") -> bool:
         """
         快捷权限检查：除了用户自身角色外，还可以额外传入一些临时角色进行检查
         """
-        # 合并临时角色到单次检查
-        checked: set["Role"] = set()
-        for r in (*user._roles, *extra):
-            if r not in checked and r.has_permission(perm):
-                return True
-            checked.add(r)
-        return False
+        with user._acquire_lock():
+            # 合并临时角色到单次检查
+            checked: set["Role"] = set()
+            for r in (*user._roles, *extra):
+                if r not in checked and r.has_permission(perm):
+                    return True
+                checked.add(r)
+            return False
 
     def get_permission_tree(self) -> Dict[str, Any]:
-        tree: Dict[str, Any] = {}
+        with self._acquire_lock():
+            tree: Dict[str, Any] = {}
 
-        def insert(perm: str, status: bool) -> None:
-            parts = (
-                [perm]
-                if (perm.startswith("[") and perm.endswith("]"))
-                else perm.split(".")
-            )
-            d = tree
-            for part in parts[:-1]:
-                if part not in d:
-                    d[part] = {}
-                d = d[part]
-            last = parts[-1]
-            if last not in d:
-                d[last] = {}
-            d[last]["__status__"] = status
+            def insert(perm: str, status: bool) -> None:
+                parts = (
+                    [perm]
+                    if (perm.startswith("[") and perm.endswith("]"))
+                    else perm.split(".")
+                )
+                d = tree
+                for part in parts[:-1]:
+                    if part not in d:
+                        d[part] = {}
+                    d = d[part]
+                last = parts[-1]
+                if last not in d:
+                    d[last] = {}
+                d[last]["__status__"] = status
 
-        # 收集所有角色权限（含继承）
-        all_perms: Set[str] = set()
-        role_queue: List[Role] = list(self._roles)
-        visited_roles: Set[Role] = set(self._roles)
-        while role_queue:
-            r = role_queue.pop(0)
-            all_perms.update(r._permissions)
-            for p in r._parents:
-                if p not in visited_roles:
-                    visited_roles.add(p)
-                    role_queue.append(p)
+            # 收集所有角色权限（含继承）
+            all_perms: Set[str] = set()
+            role_queue: List[Role] = list(self._roles)
+            visited_roles: Set[Role] = set(self._roles)
+            while role_queue:
+                r = role_queue.pop(0)
+                all_perms.update(r._permissions)
+                for p in r._parents:
+                    if p not in visited_roles:
+                        visited_roles.add(p)
+                        role_queue.append(p)
 
-        for perm in all_perms:
-            insert(perm, True)
-        for perm in self._whitelist:
-            insert(perm, True)
-        for perm in self._blacklist:
-            insert(perm, False)
+            for perm in all_perms:
+                insert(perm, True)
+            for perm in self._whitelist:
+                insert(perm, True)
+            for perm in self._blacklist:
+                insert(perm, False)
 
-        logger.debug("用户<%s> 合并权限树: %s", self.name, tree)
-        return tree
+            logger.debug("用户<%s> 合并权限树: %s", self.name, tree)
+            return tree
+
+
+# ------------------------------------------------------
+# 使用示例和测试
+# ------------------------------------------------------
+if __name__ == "__main__":
+    # 配置日志
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+    # 创建管理器
+    manager = RBACManager("test_manager")
+
+    # 多线程测试函数
+    def thread_work(thread_id: int, user: User):
+        for i in range(3):
+            perm = f"system.module{i}.action"
+            result = user.can(perm)
+            print(f"线程{thread_id} - 检查权限 {perm}: {result}")
+
+    # 创建角色和权限
+    admin_role = manager.create_role("admin")
+    admin_role.add_permission("system.*")
+
+    user_role = manager.create_role("user")
+    user_role.add_permission("system.module1.*")
+    user_role.inherit_from(admin_role)  # 继承admin的部分权限
+
+    # 创建用户
+    test_user = manager.create_user("test_user")
+    test_user.add_role(user_role)
+
+    # 多线程测试
+    import threading as th
+
+    threads = []
+    for i in range(5):
+        t = th.Thread(target=thread_work, args=(i, test_user))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    # 保存测试
+    manager.save_to_file("rbac_test.json")
+
+    # 加载测试
+    loaded_manager = RBACManager.load_from_file("rbac_test.json")
+    print(f"加载的管理器名称: {loaded_manager.name}")
+
+    # 验证加载的用户权限
+    loaded_user = loaded_manager.get_user("test_user")
+    if loaded_user:
+        print(
+            f"用户权限检查: system.module1.read -> {loaded_user.can('system.module1.read')}"
+        )
