@@ -52,8 +52,6 @@ class IMClient(Generic[APIBaseT]):
     _lock = threading.Lock()
     _initialized = False
     _rbac_manager: RBACManager = RBACManager("Root")
-    # 默认 RBAC 命名空间，用于隔离插件内置命名空间
-    _rbac_namespace: str = "Ncatbot"
 
     def __new__(cls, *args, **kwargs):
         # 双重检查锁定，确保线程安全

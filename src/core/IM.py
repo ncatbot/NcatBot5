@@ -694,7 +694,7 @@ class Message:
 # TODO 完善检查
 class User:
     _client: Optional["IMClient"] = None
-    rbac: Optional["RBACManager"] = IMClient.get_rbac()
+    rbac: Optional["RBACManager"] = None
 
     def __init__(
         self,
@@ -724,6 +724,7 @@ class User:
         self._client = IMClient.get_current()
         if not self._client:
             raise ValueError("没有选择协议")
+        self.rbac = IMClient.get_rbac()
 
         # 默认 info
         self.info = info if info is not None else UserInfo()
@@ -888,7 +889,7 @@ class User:
         self._is_full = True
         return self
 
-    @dataclass
+    @classmethod
     async def user(cls, user: UserID) -> "User":
         """快捷方法，通过用户ID获取完整 User 实例"""
         return await User(
@@ -898,7 +899,7 @@ class User:
 
 class Group:
     _client: Optional["IMClient"] = None
-    rbac: Optional["RBACManager"] = IMClient.get_rbac()
+    rbac: Optional["RBACManager"] = None
 
     def __init__(
         self,
@@ -921,6 +922,7 @@ class Group:
         from .client import IMClient
 
         self._client = IMClient.get_current()
+        self.rbac = IMClient.get_rbac()
 
         # 默认 info
         self.info = info if info is not None else GroupInfo()
@@ -1109,7 +1111,7 @@ class Group:
             return file
         return None
 
-    @dataclass
+    @classmethod
     async def group(cls, group: GroupID) -> "Group":
         """快捷方法，通过群组ID获取完整 Group 实例"""
         return await Group(
