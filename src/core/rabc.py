@@ -85,7 +85,7 @@ class RBACManager:
             raise ValueError(f"用户<{username}> 已存在（禁止覆盖）")
         user = User(self, username)
         self._users[username] = user
-        logger.info("用户<%s> 已创建", username)
+        logger.debug("用户<%s> 已创建", username)
         return user
 
     @_thread_safe
@@ -94,7 +94,7 @@ class RBACManager:
             raise ValueError(f"角色<{rolename}> 已存在（禁止覆盖）")
         role = Role(self, rolename)
         self._roles[rolename] = role
-        logger.info("角色<%s> 已创建", rolename)
+        logger.debug("角色<%s> 已创建", rolename)
         return role
 
     # -------------- 显式删除 --------------
@@ -113,7 +113,7 @@ class RBACManager:
             raise RuntimeError(f"用户<{username}> 仍被外部引用（安全检查）")
 
         del self._users[username]
-        logger.info("用户<%s> 已删除", username)
+        logger.debug("用户<%s> 已删除", username)
 
     @_thread_safe
     def delete_role(self, rolename: str) -> None:
@@ -136,7 +136,7 @@ class RBACManager:
             raise RuntimeError(f"角色<{rolename}> 仍被以下角色继承: {dependent_roles}")
 
         del self._roles[rolename]
-        logger.info("角色<%s> 已删除", rolename)
+        logger.debug("角色<%s> 已删除", rolename)
 
     # ---------- 快捷查找 ----------
     @_thread_safe
@@ -181,7 +181,7 @@ class RBACManager:
         data = self.to_dict()
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        logger.info("RBAC数据已保存到 %s", filepath)
+        logger.debug("RBAC数据已保存到 %s", filepath)
 
     # --------------------------------------------------
     # 类方法：从文件重建整个系统
@@ -194,7 +194,7 @@ class RBACManager:
 
         # 1. 先建管理器壳子
         manager = cls(data.get("manager_name", "loaded"))
-        logger.info("正在从 %s 加载RBAC数据", filepath)
+        logger.debug("正在从 %s 加载RBAC数据", filepath)
 
         # 2. 第一遍：把所有 Role / User 对象造出来（不连关系）
         role_map: Dict[str, Role] = {}
@@ -226,7 +226,7 @@ class RBACManager:
                 if role:
                     user.add_role(role)
 
-        logger.info("RBAC数据已从 %s 加载完成", filepath)
+        logger.debug("RBAC数据已从 %s 加载完成", filepath)
         return manager
 
 
@@ -266,7 +266,7 @@ class Role(ManagedEntity):
         with self._acquire_lock():
             self._check_manager_compatibility(parent_role)
             self._parents.add(parent_role)
-            logger.info("角色<%s> 继承自角色<%s>", self.name, parent_role.name)
+            logger.debug("角色<%s> 继承自角色<%s>", self.name, parent_role.name)
 
     def has_permission(
         self, perm_str: str, checked_roles: Optional[Set["Role"]] = None
@@ -328,23 +328,23 @@ class User(ManagedEntity):
         self._roles: Set[Role] = set()
         self._whitelist: Set[str] = set()
         self._blacklist: Set[str] = set()
-        logger.info("用户<%s> 已创建", name)
+        logger.debug("用户<%s> 已创建", name)
 
     def add_role(self, role: Role) -> None:
         with self._acquire_lock():
             self._check_manager_compatibility(role)
             self._roles.add(role)
-            logger.info("用户<%s> 添加角色<%s>", self.name, role.name)
+            logger.debug("用户<%s> 添加角色<%s>", self.name, role.name)
 
     def permit(self, p: str) -> None:
         with self._acquire_lock():
             self._whitelist.add(p)
-            logger.info("用户<%s> 白名单添加: %r", self.name, p)
+            logger.debug("用户<%s> 白名单添加: %r", self.name, p)
 
     def deny(self, p: str) -> None:
         with self._acquire_lock():
             self._blacklist.add(p)
-            logger.info("用户<%s> 黑名单添加: %r", self.name, p)
+            logger.debug("用户<%s> 黑名单添加: %r", self.name, p)
 
     def can(self, perm_str: str) -> bool:
         with self._acquire_lock():
@@ -352,7 +352,7 @@ class User(ManagedEntity):
             # 1. 黑名单一票否决
             for p in self._blacklist:
                 if PermissionMatcher.match(p, perm_str):
-                    logger.warning("用户<%s> 权限被黑名单拒绝: 模式=%r", self.name, p)
+                    logger.debug("用户<%s> 权限被黑名单拒绝: 模式=%r", self.name, p)
                     return False
             # 2. 白名单直接通过
             for p in self._whitelist:
