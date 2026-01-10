@@ -2,6 +2,8 @@
 """
 IM客户端
 """
+from __future__ import annotations
+
 import logging
 import threading
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Self
@@ -14,6 +16,7 @@ from src.exceptions.parse import ParseError
 
 from ..abc.protocol_abc import APIBaseT, MessageBuilderT, ProtocolABC
 from ..utils.typec import GroupID, MsgId, UserID
+from .rabc import RBACManager
 
 log = logging.getLogger("IMClient")
 
@@ -48,6 +51,7 @@ class IMClient(Generic[APIBaseT]):
     _instance: Optional[Self] = None
     _lock = threading.Lock()
     _initialized = False
+    _rbac_manager: RBACManager = RBACManager("Root")
 
     def __new__(cls, *args, **kwargs):
         # 双重检查锁定，确保线程安全
@@ -72,6 +76,45 @@ class IMClient(Generic[APIBaseT]):
             self._initialized = True
 
             log.debug(f"IMClient 初始化完成，使用协议: {self.protocol_name}")
+
+    @classmethod
+    def get_rbac(cls) -> RBACManager:
+        """获取RBAC管理器"""
+        return cls._rbac_manager
+
+    @classmethod
+    def load_rbac_tree(cls, file: str):
+        """加载RBAC树"""
+        cls._rbac_manager.load_from_file(file)
+        rbac = cls._rbac_manager
+        """权限结构
+        Default
+        User: Default
+        Group: User
+        Admin: User
+        Owner: Admin
+        """
+        root_role = {
+            "Default": (),  # 所有实体的默认权限
+            "User": ("Default",),  # 用户的权限
+            "Group": ("User",),  # 群成员的权限
+            "Admin": ("User",),  # 管理员的权限
+            "Owner": ("Admin",),  # 所有者的权限
+            # "Neko": ("Owner")         # 可爱猫娘的权限  可爱的猫娘总是有特权, 不是吗
+        }
+        for role_name, parents in root_role.items():
+            role = rbac.get_role(role_name)
+            if not role:
+                role = rbac.create_role(role_name)
+            if role is None:  # 理论上不会, 但猫娘会保护你的
+                raise RuntimeError(f"角色 {role_name} 未成功创建")
+            for parent in parents:
+                role.inherit_from(rbac.get_role(parent))
+
+    @classmethod
+    def save_rbac_tree(cls, file: str):
+        """保存RBAC树"""
+        cls._rbac_manager.save_to_file(file)
 
     @classmethod
     def get_current(cls) -> Self:
@@ -155,6 +198,7 @@ class IMClient(Generic[APIBaseT]):
 
     async def get_message(self, msg_id: MsgId) -> "Message":
         """获取消息对象"""
+        # NOTE 必须是完整对象
         response = await self.protocol.fetch_message(msg_id)
         try:
             return self.protocol._parse_message(response)
@@ -165,6 +209,7 @@ class IMClient(Generic[APIBaseT]):
 
     async def get_user(self, user_id: UserID) -> "User":
         """获取用户对象"""
+        # NOTE 必须是完整对象
         response = await self.protocol.fetch_user(user_id)
         try:
             return self.protocol._parse_user(response)
@@ -173,7 +218,7 @@ class IMClient(Generic[APIBaseT]):
             log.error(str(err))
             raise err from e
 
-    async def get_user_info(self, user_id: UserID) -> Dict[str, Any]:
+    async def get_user_info(self, user_id: UserID) -> Optional[Dict[str, Any]]:
         """获取用户详细信息"""
         try:
             response = await self.protocol.fetch_user(user_id)
@@ -183,9 +228,9 @@ class IMClient(Generic[APIBaseT]):
             elif isinstance(response, dict):
                 return response
             else:
-                return {"uid": user_id, "nickname": "未知用户"}
+                return None
         except (NotImplementedError, Exception):
-            return {"uid": user_id, "nickname": "未知用户"}
+            return None
 
     async def get_friends(self) -> List["User"]:
         """获取好友列表"""
@@ -256,44 +301,37 @@ class IMClient(Generic[APIBaseT]):
         return users
 
     # ========== 好友管理方法 ==========
-    # @unsupported_warning
+
     async def add_friend(self, user_id: UserID, remark: Optional[str] = None) -> bool:
         """发起加好友请求"""
         return await self.protocol.add_friend(user_id, remark)
 
-    # @unsupported_warning
     async def delete_friend(self, user_id: UserID) -> bool:
         """删除好友"""
         return await self.protocol.delete_friend(user_id)
 
-    # @unsupported_warning
     async def block_user(self, user_id: UserID) -> bool:
         """拉黑用户"""
         return await self.protocol.block_user(user_id)
 
-    # @unsupported_warning
     async def unblock_user(self, user_id: UserID) -> bool:
         """解除拉黑"""
         return await self.protocol.unblock_user(user_id)
 
-    # @unsupported_warning
     async def set_friend_remark(self, user_id: UserID, remark: str) -> bool:
         """设置好友备注"""
         return await self.protocol.set_friend_remark(user_id, remark)
 
-    # @unsupported_warning
     async def accept_friend_request(self, request_id: str) -> bool:
         """通过好友请求"""
         return await self.protocol.accept_friend_request(request_id)
 
-    # @unsupported_warning
     async def reject_friend_request(self, request_id: str) -> bool:
         """拒绝好友请求"""
         return await self.protocol.reject_friend_request(request_id)
 
     # ========== 群管理方法 ==========
 
-    # @unsupported_warning
     async def create_group(
         self, name: str, initial_members: List[UserID] = None
     ) -> "Group":
@@ -306,75 +344,62 @@ class IMClient(Generic[APIBaseT]):
             log.error(str(err))
             raise err from e
 
-    # @unsupported_warning
     async def set_group_admin(
         self, group_id: GroupID, user_id: UserID, is_admin: bool = True
     ) -> bool:
         """设置/取消管理员"""
         return await self.protocol.set_group_admin(group_id, user_id, is_admin)
 
-    # @unsupported_warning
     async def invite_to_group(self, group_id: GroupID, user_id: UserID) -> bool:
         """邀请成员"""
         return await self.protocol.invite_to_group(group_id, user_id)
 
-    # @unsupported_warning
     async def kick_group_member(
         self, group_id: GroupID, user_id: UserID, reason: Optional[str] = None
     ) -> bool:
         """移除成员"""
         return await self.protocol.kick_group_member(group_id, user_id, reason)
 
-    # @unsupported_warning
     # async def set_group_announcement(self, group_id: GroupID, announcement: str) -> bool:
     #     """发布/编辑群公告"""
     #     return await self.protocol.set_group_announcement(group_id, announcement)
 
-    # @unsupported_warning
     async def set_group_name(self, group_id: GroupID, name: str) -> bool:
         """修改群名称"""
         return await self.protocol.set_group_name(group_id, name)
 
-    # @unsupported_warning
     async def set_group_avatar(self, group_id: GroupID, avatar_url: str) -> bool:
         """修改群头像"""
         return await self.protocol.set_group_avatar(group_id, avatar_url)
 
-    # @unsupported_warning
     async def disband_group(self, group_id: GroupID) -> bool:
         """解散群"""
         return await self.protocol.disband_group(group_id)
 
-    # @unsupported_warning
     async def transfer_group_ownership(
         self, group_id: GroupID, new_owner_id: UserID
     ) -> bool:
         """转让群主"""
         return await self.protocol.transfer_group_ownership(group_id, new_owner_id)
 
-    # @unsupported_warning
     async def leave_group(self, group_id: GroupID) -> bool:
         """退出群组"""
         return await self.protocol.leave_group(group_id)
 
     # ========== 个人资料管理 ==========
 
-    # @unsupported_warning
     async def set_self_nickname(self, nickname: str) -> bool:
         """设置/修改本人昵称"""
         return await self.protocol.set_self_nickname(nickname)
 
-    # @unsupported_warning
     async def set_self_avatar(self, avatar_url: str) -> bool:
         """设置/修改本人头像"""
         return await self.protocol.set_self_avatar(avatar_url)
 
-    # @unsupported_warning
     async def set_self_signature(self, signature: str) -> bool:
         """设置/修改本人签名/状态"""
         return await self.protocol.set_self_signature(signature)
 
-    # @unsupported_warning
     async def update_self_profile(self, profile_data: Dict[str, Any]) -> bool:
         """批量更新个人资料"""
         return await self.protocol.update_self_profile(profile_data)

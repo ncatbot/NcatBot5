@@ -5,4 +5,7 @@ bot = Bot(
     plugin_dir="plugins",
 )
 
-bot.run()
+try:
+    bot.run()
+except KeyboardInterrupt:
+    pass

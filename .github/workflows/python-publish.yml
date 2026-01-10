@@ -38,7 +38,7 @@ jobs:
         run: python -m build --sdist --wheel
 
       - name: 上传构建产物
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: dist-${{ github.run_number }}
           path: dist/
@@ -52,7 +52,7 @@ jobs:
       github.event_name == 'workflow_dispatch'
     steps:
       - name: 下载构建产物
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v6
         with:
           name: dist-${{ github.run_number }}
           path: dist/

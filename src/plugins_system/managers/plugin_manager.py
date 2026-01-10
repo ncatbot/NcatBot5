@@ -794,6 +794,8 @@ class DefaultPluginManager(PluginManager):
 
             plugin.context.close()
 
+            await self.config_manager.save_config(plugin.module_name, plugin.config)
+
             await self.loader.unload_plugin_module(plugin_name)
 
             with self._lock:

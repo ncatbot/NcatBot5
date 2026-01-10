@@ -3,6 +3,9 @@ import logging
 from pathlib import Path
 from typing import ClassVar, Literal, Optional, Self
 
+import aiofiles
+import aiofiles.os
+
 from .abc.protocol_abc import ProtocolABC, ProtocolMeta
 from .connector import AsyncWebSocketClient
 from .core.client import IMClient
@@ -73,21 +76,30 @@ class Bot:
 
     # ---------- 同步入口 ----------
     def run(self) -> None:
-        """阻塞式启动，直到 Bot 退出"""
+        """阻塞式启动，直到 Bot 退出（支持嵌套事件循环）。"""
 
-        async def _():
-            await self.run_async()
-            while not Bot.running:
-                await asyncio.sleep(0.1)
+        async def _runner() -> None:
+            try:
+                await self.run_async()
+                await self._stop_event.wait()
+            except asyncio.CancelledError:
+                log.info("Bot 任务被取消")
+            except Exception:
+                log.exception("Bot 运行异常")
+            finally:
+                # 保证 stop() 与 run_async() 在同一个循环
+                await self.stop()
+                Bot.running = False
 
+        # 如果已经有循环，直接跑；否则新建
         try:
-            asyncio.run(_())
-        except KeyboardInterrupt:
-            pass
-        except Exception as e:
-            log.exception(f"Bot 运行异常: {e}")
-        finally:
-            Bot.running = False
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # 没有正在运行的循环，用 asyncio.run
+            asyncio.run(_runner())
+        else:
+            # 已有循环（Jupyter / 测试框架）
+            loop.run_until_complete(_runner())
 
     # ---------- 异步入口 ----------
     async def run_async(self) -> None:
@@ -116,6 +128,17 @@ class Bot:
             # 实例化 IMClient
             self._im_client = IMClient(self.protocol)
 
+            # 初始化内部插件
+            Path(self.plugin_sys.config_dir / "Ncatbot").mkdir(
+                parents=True, exist_ok=True
+            )
+
+            # 加载 RBAC 树
+            rbac_tree = Path(self.plugin_sys.data_dir / "Ncatbot" / "rbac.json")
+            await aiofiles.os.makedirs(rbac_tree.parent, exist_ok=True)
+            if rbac_tree.is_file():
+                self._im_client.load_rbac_tree(rbac_tree.absolute())
+
             # 启动插件
             await self.plugin_sys.start()
             log.info("插件系统启动完成")
@@ -124,13 +147,14 @@ class Bot:
 
             while not self._stop_event.is_set():
                 await self._cat()
-            # await asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)  # 让出时间片，确保清理任务能运行
 
         except KeyboardInterrupt:
             await self.stop()
         except Exception as e:
             log.error(e)
             await self.stop()
+            raise e
         finally:
             Bot.running = False
 
@@ -167,6 +191,9 @@ class Bot:
         self._stop_event.set()
 
         log.info("Bot 已完全停止")
+        rbac_tree = Path(self.plugin_sys.data_dir / "Ncatbot" / "rbac.json")
+        await aiofiles.os.makedirs(rbac_tree.parent, exist_ok=True)
+        self._im_client.save_rbac_tree(rbac_tree.absolute())
         raise KeyboardInterrupt()
 
     # ---------- 工具 ----------
