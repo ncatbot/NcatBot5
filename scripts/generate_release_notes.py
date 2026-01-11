@@ -143,6 +143,9 @@ def main():
     args = parser.parse_args()
 
     tag = get_env_tag()
+    if not tag.startswith("v"):
+        print("跳过无效版本标签")
+        sys.exit(0)
     if not tag:
         print("错误：未检测到标签。请确保在标签推送时运行或设置TAG_NAME环境变量。")
         sys.exit(1)
