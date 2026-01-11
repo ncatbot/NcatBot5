@@ -193,7 +193,7 @@ class Bot:
         log.info("Bot 已完全停止")
         rbac_tree = Path(self.plugin_sys.data_dir / "Ncatbot" / "rbac.json")
         await aiofiles.os.makedirs(rbac_tree.parent, exist_ok=True)
-        self._im_client.save_rbac_tree(rbac_tree.absolute())
+        IMClient.save_rbac_tree(rbac_tree.absolute())
         raise KeyboardInterrupt()
 
     # ---------- 工具 ----------
