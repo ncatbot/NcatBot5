@@ -2,9 +2,10 @@ from abc import abstractmethod
 
 from ..plugins_system import Plugin
 from .client import IMClient
+from .plugin_mixin.configer import ConfigerMixin
 
 
-class PluginBase(Plugin):
+class PluginBase(Plugin, ConfigerMixin):
     def __init__(self, context, config, debug=False):
         super().__init__(context, config, debug)
         self._client = None
