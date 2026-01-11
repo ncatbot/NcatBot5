@@ -27,7 +27,7 @@ class PluginMixin(ABC):
 
         注意：混入类的__init__应该调用super()来确保所有基类正确初始化
         """
-        super().__init__(*args, **kwargs)
+        # super().__init__(*args, **kwargs)
         # _plugin 会在 Plugin 基类中设置
 
         # 魔↗术↘技↘巧↗

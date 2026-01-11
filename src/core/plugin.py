@@ -6,6 +6,8 @@ from .plugin_mixin.configer import ConfigerMixin
 
 
 class PluginBase(Plugin, ConfigerMixin):
+    """Base"""
+
     def __init__(self, context, config, debug=False):
         super().__init__(context, config, debug)
         self._client = None

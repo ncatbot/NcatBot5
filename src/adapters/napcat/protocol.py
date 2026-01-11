@@ -194,10 +194,10 @@ class NapcatProtocol(ProtocolABC):
             last_active=dt.datetime.now(),
         )
         return User(
-            uid=str(raw["user_id"]) if raw.get("user_id") else None,
-            nickname=raw.get("nickname"),
-            role=raw.get("role"),
-            group_name=raw.get("card") or raw.get("nickname"),
+            uid=str(raw["user_id"]),
+            nickname=raw["nickname"],
+            role=raw.get("role", None),
+            group_name=raw.get("card"),
             info=info,
         )
 

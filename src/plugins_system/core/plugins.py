@@ -203,7 +203,10 @@ class PluginMeta(ABCMeta):
         cls, name: str, bases: Tuple[type, ...], attrs: Dict[str, Any]
     ) -> None:
         super().__init__(name, bases, attrs)
-        if getattr(cls, "__abstractmethods__", None):  # 这里用真值判断即可
+        if not hasattr(cls, "name"):
+            return
+
+        if "Base" in str(cls.__doc__):
             return
 
         # 验证必需属性
@@ -291,6 +294,7 @@ class Plugin(ABC, metaclass=PluginMeta):
             config: 插件配置 - 支持子类覆盖默认配置
             debug: 调试模式
         """
+
         # 设置基本属性
         self.context = context
         self.config = config
@@ -424,13 +428,13 @@ class Plugin(ABC, metaclass=PluginMeta):
         """设置混入类"""
         for mixin_class in self._mixins:
             if isinstance(self, mixin_class):
-                # 调用混入类的初始化方法
-                if (
-                    hasattr(mixin_class, "__init__")
-                    and mixin_class.__init__ is not object.__init__
-                ):
-                    # 确保混入类的 __init__ 被正确调用
-                    mixin_class.__init__(self)
+                # NOTE: 不需要调用__init__，MRO自动处理
+                # if (
+                #     hasattr(mixin_class, "__init__")
+                #     and mixin_class.__init__ is not object.__init__
+                # ):
+                #     # 确保混入类的 __init__ 被正确调用
+                #     mixin_class.__init__(self)
 
                 # 设置插件引用
                 if hasattr(mixin_class, "_set_plugin"):
@@ -594,6 +598,11 @@ class Plugin(ABC, metaclass=PluginMeta):
 
     @abstractmethod
     async def on_load(self) -> None:
+        """插件加载时的回调 —— 子类允许同步或异步实现"""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def on_reload(self) -> None:
         """插件加载时的回调 —— 子类允许同步或异步实现"""
         raise NotImplementedError
 

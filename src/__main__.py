@@ -45,6 +45,8 @@ class Bot:
         debug: bool = DefaultSetting.debug,
         reload_mode: Literal["all", "smart", "single"] = "smart",
     ):
+        self.debug = debug
+
         # 插件系统
         plugin_dirs = [Path(__file__).resolve().parent / "sys_plugin"]
         if plugin_dir:
@@ -153,8 +155,9 @@ class Bot:
             await self.stop()
         except Exception as e:
             log.error(e)
-            await self.stop()
-            raise e
+            if not self.debug:
+                await self.stop()
+                raise e
         finally:
             Bot.running = False
 

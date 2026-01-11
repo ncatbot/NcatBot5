@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict
-
-import yaml
 
 from . import PluginMixin
 
@@ -35,11 +32,9 @@ class DictProxy(dict):
 
 
 class ConfigerMixin(PluginMixin):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        config_path: Path = self.context.config_dir
-        with config_path.open("r", encoding="utf-8") as f:
-            self._config = DictProxy(yaml.load(f, Loader=yaml.SafeLoader) or {})
+    def __init__(self):
+        super().__init__()
+        self._config = DictProxy()
 
     # ---------- 只读访问 ----------
     @property
@@ -49,16 +44,11 @@ class ConfigerMixin(PluginMixin):
     # ---------- 整表替换 ----------
     @config.setter
     def config(self, val: Dict[str, Any] | DictProxy) -> None:
+        if not getattr(self, "_config", None):
+            self._config = DictProxy()
         if isinstance(val, dict):
             self._config = DictProxy(val)
         elif isinstance(val, DictProxy):
             self._config = val
         else:
             raise ValueError("未知的字典设置类型")
-
-    # ---------- 插件卸载时落盘 ----------
-    def on_mixin_unload(self) -> None:
-        config_path: Path = self.context.config_dir
-        with config_path.open("w", encoding="utf-8") as f:
-            # 只写纯 dict，避免把 _log 也序列化
-            yaml.dump(self._config.to_dict(), f, allow_unicode=True, sort_keys=False)

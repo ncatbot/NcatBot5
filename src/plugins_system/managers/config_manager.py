@@ -76,6 +76,7 @@ class ConfigManager:
             如果成功保存返回True，否则返回False
         """
         try:
+            config = dict(config)
             plugin_config_dir = self.config_base_dir / plugin_name
             await aiofiles.os.makedirs(plugin_config_dir, exist_ok=True)
 
