@@ -860,6 +860,18 @@ class User:
     async def set_remark(self, remark: str) -> bool:
         return await self._client.set_friend_remark(self._uid, remark)
 
+    async def get_avatar(self) -> Optional[Resource]:
+        file = None
+        if self._avatar_url:
+            file = resource_open(self._avatar_url)
+        else:
+            await self.build()
+            if self._avatar_url:
+                file = resource_open(self._avatar_url)
+        if file:
+            return file
+        return None
+
     # 静态方法
     @staticmethod
     async def accept_friend_request(request_id: str) -> bool:

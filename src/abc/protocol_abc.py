@@ -94,7 +94,7 @@ class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMet
 
     @property
     @abstractmethod
-    def api(self) -> Optional[APIBaseT]:
+    def api(self) -> APIBaseT:
         """获取所属的APIBase实例"""
 
     @property
@@ -338,6 +338,8 @@ class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMet
     @abstractmethod
     async def update_self_profile(self, profile_data: Dict[str, Any]) -> bool:
         """批量更新个人资料"""
+
+    # ========== 信息显示 ==========
 
     @abstractmethod
     async def print_event(self, msg: Event) -> None:

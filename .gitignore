@@ -222,7 +222,6 @@ __marimo__/
 .Spotlight-V100
 plugins
 config
-pack.zip
 test.py
 data
 logs
@@ -231,19 +230,3 @@ pack.sh
 doc.txt
 .vscode
 digest.txt
-functest.py
-src/adapters/napcat/data_models/__init__.py
-src/adapters/napcat/data_models/status.py
-src/adapters/napcat/data_models/message/__init__.py
-src/adapters/napcat/data_models/message/base_message.py
-src/adapters/napcat/data_models/message/group_message.py
-src/adapters/napcat/data_models/message/message_chain.py
-src/adapters/napcat/data_models/message/message_nope.py
-src/adapters/napcat/data_models/message/meta_event.py
-src/adapters/napcat/data_models/message/notice_event.py
-src/adapters/napcat/data_models/message/private_message.py
-src/adapters/napcat/data_models/message/request_event.py
-src/adapters/napcat/data_models/message/doc/message.md
-src/adapters/napcat/data_models/message/doc/meta.md
-src/adapters/napcat/data_models/message/doc/notice.md
-src/adapters/napcat/data_models/message/doc/request.md
