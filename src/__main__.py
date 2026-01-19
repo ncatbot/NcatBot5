@@ -85,6 +85,7 @@ class Bot:
                 await self.run_async()
                 await self._stop_event.wait()
             except asyncio.CancelledError:
+                print()  # 我发现这里加一个可以好看点
                 log.info("Bot 任务被取消")
             except Exception:
                 log.exception("Bot 运行异常")

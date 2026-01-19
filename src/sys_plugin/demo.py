@@ -1,4 +1,6 @@
 from src import PluginBase
+from src.core.IM import Message
+from src.plugins_system import Event
 
 # from src.core.IM import User
 
@@ -14,15 +16,18 @@ class DemoSer(PluginBase):
             self.config["loaded"] += 1
         else:
             self.config["loaded"] = 1
-        self.logger.info(self.__dict__)
+        # self.logger.info(self.__dict__)
         self.logger.info("hi")
 
         # await User("3123651157").send_text("DemoSer_plugin loaded successfully")
+        # self.register_handlers({
+        #     're:.*': self.p
+        # })
 
     async def on_reload(self):
         # raise ValueError()
 
-        self.logger.info(self.__dict__)
+        # self.logger.info(self.__dict__)
         self.logger.info("reload")
 
     # @online_service("demo_service", event_mod=False)
@@ -32,6 +37,12 @@ class DemoSer(PluginBase):
 
     async def on_unload(self):
         self.logger.info("Demo Service stopped")
+
+    def p(self, e: Event[Message]):
+        if not isinstance(e.data, Message):
+            return
+        msg = e.data
+        print(msg.raw["raw_message"])
 
 
 # __plugin__ = [

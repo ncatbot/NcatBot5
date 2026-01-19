@@ -582,7 +582,7 @@ class DefaultPluginManager(PluginManager):
             return
 
         logger.info(
-            f"开始处理文件变更（模式={self.reload_mode}）: {', '.join([str(p) for p in paths])}"
+            f"开始处理文件变更|{self.reload_mode} : {', '.join([str(p) for p in paths])}"
         )
 
         impacted_plugins, discovered_sources = self._analyze_fs_changes(paths)
