@@ -160,7 +160,7 @@ class NapcatProtocol(ProtocolABC):
             raise RuntimeError(raw)
 
         # 解析消息内容
-        content = self._parse_message_content(raw.get("message", []))
+        content = self._parse_message_content(raw["message"])
 
         # 解析时间戳
         time = raw.get("time")
@@ -173,14 +173,16 @@ class NapcatProtocol(ProtocolABC):
             timestamp = dt.datetime.now()
 
         msg = Message(
-            msg_id=MsgId.new("napcat", raw.get("message_id"), time),
-            sender_id=str(raw["user_id"]) if raw.get("user_id") else None,
+            msg_id=MsgId.new("napcat", raw["message_id"], time),
+            sender_id=UserID(raw["user_id"]),
             content=content,
-            # TODO 完善 message_type 部分
-            message_type=raw.get("message_type", "unknown"),
+            message_type=raw["sub_type"],
             timestamp=timestamp,
-            group_id=str(raw["group_id"]) if raw.get("group_id") else None,
+            group_id=GroupID(raw["group_id"]) if raw.get("group_id") else None,
             raw=raw,
+            # TODO
+            # reference=,
+            # forward_info=,
         )
         if "sender" in raw:
             msg._sender_cache = self._parse_user(raw.get("sender"))
@@ -189,16 +191,21 @@ class NapcatProtocol(ProtocolABC):
 
     def _parse_user(self, raw: Dict[str, Any]) -> User:
         """解析用户"""
+        uid = str(raw["user_id"])
+        nickname = raw.get("card") or raw["nickname"]
+
         info = UserInfo(
             is_online=True,
             last_active=dt.datetime.now(),
         )
+
         return User(
-            uid=str(raw["user_id"]),
-            nickname=raw["nickname"],
-            role=raw.get("role", None),
-            group_name=raw.get("card"),
+            uid=uid,
             info=info,
+            nickname=nickname,
+            role=raw.get("role", "user"),
+            group_id=raw.get("group_id"),
+            from_protocol=True,
         )
 
     def _parse_group(self, raw: Dict[str, Any]) -> Group:
@@ -207,6 +214,7 @@ class NapcatProtocol(ProtocolABC):
             gid=str(raw.get("group_id", raw.get("gid", ""))),
             name=raw.get("group_name", raw.get("name", "")),
             description=raw.get("description"),
+            from_protocol=True,
         )
 
     def _parse_event(self, raw: tuple[str, MessageType]) -> "Event | None":
@@ -504,10 +512,10 @@ class NapcatProtocol(ProtocolABC):
         msg = event.data
         sender = await msg.get_sender()
         group_id = msg.group_id
-        nick = await sender.get_nickname()
+        nick = sender.nickname
         if group_id:
             groupi = await msg.get_group()
-            name = await groupi.get_name()
+            name = groupi.name
             logger.info(LogFormats.modern(group_id, nick, sender.uid, msg, name))
         else:
             logger.info(LogFormats.modern(None, nick, sender.uid, msg))

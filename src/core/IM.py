@@ -729,26 +729,6 @@ class User:
         # 默认 info
         self.info = info if info is not None else UserInfo()
 
-        def _info_complete(i: UserInfo) -> bool:
-            for v in i.__dict__.values():
-                if v is None:
-                    return False
-            return True
-
-        # 协议实例必须完整
-        if from_protocol:
-            if (
-                not _info_complete(self.info)
-                or self._nickname is None
-                or self._avatar_url is None
-            ):
-                raise ValueError(
-                    "协议实例必须完整 (nickname, avatar_url, info 全部非空)"
-                )
-            self._is_full = True
-        else:
-            self._is_full = False
-
     @property
     def uid(self) -> UserID:
         return self._uid
@@ -938,23 +918,6 @@ class Group:
 
         # 默认 info
         self.info = info if info is not None else GroupInfo()
-
-        def _info_complete(i: GroupInfo) -> bool:
-            for v in i.__dict__.values():
-                if v is None:
-                    return False
-            return True
-
-        if from_protocol:
-            if (
-                not _info_complete(self.info)
-                or self._name is None
-                or self._avatar_url is None
-            ):
-                raise ValueError("协议实例必须完整 (name, avatar_url, info 全部非空)")
-            self._is_full = True
-        else:
-            self._is_full = False
 
     @property
     def description(self) -> Optional[str]:

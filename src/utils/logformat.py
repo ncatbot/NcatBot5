@@ -212,13 +212,13 @@ class LogFormats:
         """现代风格 - 简洁美观"""
         if group_id:
             return (
-                f"{Color.CYAN}▸ {Color.GREEN}{group_name} "
+                f"{Color.RESET}{Color.GREEN}{group_name} "
                 f"{Color.GRAY}• {Color.YELLOW}{nick} "
-                f"{Color.GRAY}({uid}){Color.WHITE} ➜ {msg}{Color.RESET}"
+                f"{Color.GRAY}({uid}){Color.CYAN} ▸ {Color.RESET}{msg}{Color.RESET}"
             )
         return (
-            f"{Color.MAGENTA}▸ {Color.YELLOW}{nick} "
-            f"{Color.GRAY}({uid}){Color.CYAN} ➜ {msg}{Color.RESET}"
+            f"{Color.RESET}{Color.YELLOW}{nick} "
+            f"{Color.GRAY}({uid}){Color.MAGENTA} ▸ {Color.RESET}{msg}{Color.RESET}"
         )
 
     @staticmethod
