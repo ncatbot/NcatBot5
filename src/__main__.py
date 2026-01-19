@@ -69,6 +69,8 @@ class Bot:
         self._stop_event = asyncio.Event()
 
         self.token = token
+        if token is None:
+            log.warning("未设置 token")
         self.url = url
 
     # ---------- 公开属性 ----------
