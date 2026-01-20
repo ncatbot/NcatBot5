@@ -489,7 +489,7 @@ class Message:
         )
 
     # 消息操作
-    async def reply(self, content: MessageChain) -> "Message":
+    async def reply(self, content: MessageChain) -> bool:
         """回复这条消息，添加新内容"""
         if self._id is None:
             raise ValueError("无法回复一条没有ID的消息")
@@ -554,7 +554,7 @@ class Message:
 
     async def forward_to_group(
         self, group_id: GroupID, extra_content: Optional[MessageChain] = None
-    ) -> "Message":
+    ) -> bool:
         """转发消息到指定群组
 
         Args:
@@ -586,7 +586,7 @@ class Message:
 
         return await self._client.send_group_message(group_id, msg)
 
-    async def resend(self) -> "Message":
+    async def resend(self) -> bool:
         """重新发送这条消息的内容"""
         if self._group_id is None:
             # 重新发送给用户
@@ -975,7 +975,7 @@ class Group:
         return self
 
     # 群聊快捷
-    async def send_text(self, text: str) -> Message:
+    async def send_text(self, text: str) -> bool:
         """发送文本消息到群聊"""
         message = Message.create(
             content=MessageChain.from_text(text),
@@ -984,7 +984,7 @@ class Group:
         )
         return await self._client.send_group_message(self._gid, message)
 
-    async def send_message(self, message: Message) -> Message:
+    async def send_message(self, message: Message) -> bool:
         """发送消息到群聊"""
         # 确保消息的发送者是当前用户且目标群组正确
         if (
@@ -1005,7 +1005,7 @@ class Group:
             return await self._client.send_group_message(self._gid, new_message)
         return await self._client.send_group_message(self._gid, message)
 
-    async def send_message_chain(self, content: MessageChain) -> Message:
+    async def send_message_chain(self, content: MessageChain) -> bool:
         """发送消息链到群聊"""
         message = Message.create(
             content=content,

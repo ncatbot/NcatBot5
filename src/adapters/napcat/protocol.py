@@ -38,7 +38,7 @@ class NapcatProtocol(ProtocolABC):
 
     # ========== 核心消息发送 ==========
 
-    async def send_group_message(self, gid: GroupID, content: Message) -> RawMessage:
+    async def send_group_message(self, gid: GroupID, content: Message) -> bool:
         """发送群消息"""
         # 将 Message 转换为 napcat 的消息格式
         await self._print_message(Event(event="message.group", data=content))
@@ -49,9 +49,9 @@ class NapcatProtocol(ProtocolABC):
             group_id=gid, message=message_segments
         )
 
-        return response
+        return response["retcode"] == 0
 
-    async def send_private_message(self, uid: UserID, content: Message) -> RawMessage:
+    async def send_private_message(self, uid: UserID, content: Message) -> bool:
         """发送私聊消息"""
         await self._print_message(Event(event="message.private", data=content))
         # 将 Message 转换为 napcat 的消息格式
@@ -62,7 +62,7 @@ class NapcatProtocol(ProtocolABC):
             user_id=uid, message=message_segments
         )
 
-        return response
+        return response["retcode"] == 0
 
     async def login(self, url: str, token: str, **kwd):
         """登录并建立WebSocket连接
@@ -301,6 +301,8 @@ class NapcatProtocol(ProtocolABC):
             elif isinstance(node, str):
                 # 字符串直接转为text节点
                 segments.append({"type": "text", "data": {"text": node}})
+            else:
+                logger.warning("napcat协议未知消息节点: %s", node)
 
         return segments
 

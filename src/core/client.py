@@ -168,29 +168,17 @@ class IMClient(Generic[APIBaseT]):
         self,
         group_id: GroupID,
         msg: "Message",
-    ) -> "Message":
+    ) -> bool:
         """发送群消息"""
-        response = await self.protocol.send_group_message(group_id, msg)
-        try:
-            return self.protocol._parse_message(response)
-        except Exception as e:
-            err = ParseError(self.protocol.protocol_name, "parse_message", response)
-            log.error(str(err))
-            raise err from e
+        return await self.protocol.send_group_message(group_id, msg)
 
     async def send_private_message(
         self,
         user_id: UserID,
         msg: "Message",
-    ) -> "Message":
+    ) -> bool:
         """发送私聊消息"""
-        response = await self.protocol.send_private_message(user_id, msg)
-        try:
-            return self.protocol._parse_message(response)
-        except Exception as e:
-            err = ParseError(self.protocol.protocol_name, "解析消息", response)
-            log.error(str(err))
-            raise err from e
+        return await self.protocol.send_private_message(user_id, msg)
 
     async def recall_message(self, msg_id: MsgId) -> bool:
         """撤回消息"""
