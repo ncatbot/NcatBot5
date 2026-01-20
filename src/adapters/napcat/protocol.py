@@ -89,8 +89,17 @@ class NapcatProtocol(ProtocolABC):
         listener = await client.create_listener()
         await client.start()
         try:
-            msg = await client.get_message(listener)
-            await self._print_meta(self._parse_event(msg))
+            msg, msg_type = await client.get_message(listener)
+            meta_event = self._parse_event((msg, msg_type))
+            if meta_event:
+                await self._print_meta(meta_event)
+            elif msg_type == MessageType.Text:
+                msg = json.loads(msg)
+                raise RuntimeError(
+                    f"连接错误({msg['status']}|{msg['retcode']}): {msg.get('wording') or msg['message']}"
+                )
+            else:
+                raise RuntimeError(f"未知连接错误: {msg}")
         finally:
             await client.remove_listener(listener)
 

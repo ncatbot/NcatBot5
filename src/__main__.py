@@ -125,7 +125,6 @@ class Bot:
             self.ws: AsyncWebSocketClient = await self.protocol.login(
                 self.url, self.token
             )
-            log.info("Bot登录成功")
 
             # 监听器
             self.listener = await self.ws.create_listener()
@@ -158,7 +157,7 @@ class Bot:
             await self.stop()
         except Exception as e:
             log.error(e)
-            if not self.debug:
+            if self.debug:
                 await self.stop()
                 raise e
         finally:
