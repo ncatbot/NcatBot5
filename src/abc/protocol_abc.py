@@ -111,7 +111,7 @@ class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMet
     # 这些是固定的接口签名，所有协议必须实现
 
     @abstractmethod
-    async def send_group_message(self, gid: "GroupID", content: "Message") -> bool:
+    async def send_group_message(self, gid: "GroupID", content: "Message") -> MsgId:
         """
         发送群消息
         Args:
@@ -123,7 +123,7 @@ class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMet
         pass
 
     @abstractmethod
-    async def send_private_message(self, uid: "UserID", content: "Message") -> bool:
+    async def send_private_message(self, uid: "UserID", content: "Message") -> MsgId:
         """
         发送私聊消息
         Args:

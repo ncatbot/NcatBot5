@@ -38,7 +38,7 @@ class NapcatProtocol(ProtocolABC):
 
     # ========== 核心消息发送 ==========
 
-    async def send_group_message(self, gid: GroupID, content: Message) -> bool:
+    async def send_group_message(self, gid: GroupID, content: Message) -> MsgId:
         """发送群消息"""
         # 将 Message 转换为 napcat 的消息格式
         await self._print_message(Event(event="message.group", data=content))
@@ -49,9 +49,9 @@ class NapcatProtocol(ProtocolABC):
             group_id=gid, message=message_segments
         )
 
-        return response["retcode"] == 0
+        return MsgId.new("napcat", response["data"]["message_id"])
 
-    async def send_private_message(self, uid: UserID, content: Message) -> bool:
+    async def send_private_message(self, uid: UserID, content: Message) -> MsgId:
         """发送私聊消息"""
         await self._print_message(Event(event="message.private", data=content))
         # 将 Message 转换为 napcat 的消息格式
@@ -62,7 +62,7 @@ class NapcatProtocol(ProtocolABC):
             user_id=uid, message=message_segments
         )
 
-        return response["retcode"] == 0
+        return MsgId.new("napcat", response["data"]["message_id"])
 
     async def login(self, url: str, token: str, **kwd):
         """登录并建立WebSocket连接
@@ -140,7 +140,7 @@ class NapcatProtocol(ProtocolABC):
 
     async def recall_message(self, msg_id: MsgId) -> bool:
         """撤回消息"""
-        response = await self._api.message.delete_msg(message_id=msg_id)
+        response = await self._api.message.delete_msg(message_id=msg_id.parse().real_id)
         return response.get("status") == "ok"
 
     async def logout(self) -> bool:
@@ -154,7 +154,7 @@ class NapcatProtocol(ProtocolABC):
 
     async def fetch_message(self, msg_id: MsgId) -> RawMessage:
         """获取消息详情"""
-        response = await self._api.message.get_msg(message_id=msg_id)
+        response = await self._api.message.get_msg(message_id=msg_id.parse().real_id)
         return response.get("data", response)
 
     # ========== 数据解析 ==========

@@ -168,7 +168,7 @@ class IMClient(Generic[APIBaseT]):
         self,
         group_id: GroupID,
         msg: "Message",
-    ) -> bool:
+    ) -> MsgId:
         """发送群消息"""
         return await self.protocol.send_group_message(group_id, msg)
 
@@ -176,7 +176,7 @@ class IMClient(Generic[APIBaseT]):
         self,
         user_id: UserID,
         msg: "Message",
-    ) -> bool:
+    ) -> MsgId:
         """发送私聊消息"""
         return await self.protocol.send_private_message(user_id, msg)
 

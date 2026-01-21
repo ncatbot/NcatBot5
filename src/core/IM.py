@@ -489,7 +489,7 @@ class Message:
         )
 
     # 消息操作
-    async def reply(self, content: MessageChain) -> bool:
+    async def reply(self, content: MessageChain) -> MsgId:
         """回复这条消息，添加新内容"""
         if self._id is None:
             raise ValueError("无法回复一条没有ID的消息")
@@ -514,13 +514,13 @@ class Message:
         else:
             return await self._client.send_private_message(self._sender_id, reply_msg)
 
-    async def reply_text(self, text: str) -> "Message":
+    async def reply_text(self, text: str) -> MsgId:
         """用文本回复这条消息"""
         return await self.reply(MessageChain.from_text(text))
 
     async def forward_to_user(
         self, user_id: UserID, extra_content: Optional[MessageChain] = None
-    ) -> "Message":
+    ) -> MsgId:
         """转发消息给指定用户
 
         Args:
@@ -554,7 +554,7 @@ class Message:
 
     async def forward_to_group(
         self, group_id: GroupID, extra_content: Optional[MessageChain] = None
-    ) -> bool:
+    ) -> MsgId:
         """转发消息到指定群组
 
         Args:
@@ -586,7 +586,7 @@ class Message:
 
         return await self._client.send_group_message(group_id, msg)
 
-    async def resend(self) -> bool:
+    async def resend(self) -> MsgId:
         """重新发送这条消息的内容"""
         if self._group_id is None:
             # 重新发送给用户
@@ -784,7 +784,7 @@ class User:
             return user.can(perm_str)
 
     # 快捷私聊
-    async def send_text(self, text: str) -> Message:
+    async def send_text(self, text: str) -> MsgId:
         """发送文本消息"""
         message = Message.create(
             content=MessageChain.from_text(text),
@@ -792,7 +792,7 @@ class User:
         )
         return await self._client.send_private_message(self._uid, message)
 
-    async def send_message(self, message: Message) -> Message:
+    async def send_message(self, message: Message) -> MsgId:
         """发送消息"""
         # 确保消息的发送者是当前用户
         if message.sender_id != self._client.protocol.self_id:
@@ -810,7 +810,7 @@ class User:
             return await self._client.send_private_message(self._uid, new_message)
         return await self._client.send_private_message(self._uid, message)
 
-    async def send_message_chain(self, content: MessageChain) -> Message:
+    async def send_message_chain(self, content: MessageChain) -> MsgId:
         """发送消息链"""
         message = Message.create(
             content=content,
@@ -820,7 +820,7 @@ class User:
 
     async def forward_message(
         self, message: Message, extra_content: Optional[MessageChain] = None
-    ) -> Message:
+    ) -> MsgId:
         """转发消息给当前用户"""
         return await message.forward_to_user(self._uid, extra_content)
 
@@ -975,7 +975,7 @@ class Group:
         return self
 
     # 群聊快捷
-    async def send_text(self, text: str) -> bool:
+    async def send_text(self, text: str) -> MsgId:
         """发送文本消息到群聊"""
         message = Message.create(
             content=MessageChain.from_text(text),
@@ -984,7 +984,7 @@ class Group:
         )
         return await self._client.send_group_message(self._gid, message)
 
-    async def send_message(self, message: Message) -> bool:
+    async def send_message(self, message: Message) -> MsgId:
         """发送消息到群聊"""
         # 确保消息的发送者是当前用户且目标群组正确
         if (
@@ -1005,7 +1005,7 @@ class Group:
             return await self._client.send_group_message(self._gid, new_message)
         return await self._client.send_group_message(self._gid, message)
 
-    async def send_message_chain(self, content: MessageChain) -> bool:
+    async def send_message_chain(self, content: MessageChain) -> MsgId:
         """发送消息链到群聊"""
         message = Message.create(
             content=content,
