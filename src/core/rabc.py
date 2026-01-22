@@ -16,7 +16,7 @@ import logging
 import re
 import sys
 import threading
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
 logger = logging.getLogger("RBAC")
 
@@ -101,14 +101,14 @@ class RBACManager:
     @_thread_safe
     def delete_user(self, username: str) -> None:
         """
-        删除用户，若不存在抛 KeyError。
-        可选：若检测到外部强引用可拒绝删除（安全模式）。
+        删除用户，若不存在抛 KeyError
+        可选：若检测到外部强引用可拒绝删除（安全模式）
         """
         if username not in self._users:
             raise KeyError(f"用户<{username}> 不存在")
         user = self._users[username]
 
-        # 因为 _users 里的是强引用，所以引用计数 >=2 说明外部仍持有。
+        # 因为 _users 里的是强引用，所以引用计数 >=2 说明外部仍持有
         if sys.getrefcount(user) > 2:
             raise RuntimeError(f"用户<{username}> 仍被外部引用（安全检查）")
 
@@ -118,8 +118,8 @@ class RBACManager:
     @_thread_safe
     def delete_role(self, rolename: str) -> None:
         """
-        删除角色，若不存在抛 KeyError。
-        额外检查：仍有用户继承该角色时拒绝删除（可解除继承后再删）。
+        删除角色，若不存在抛 KeyError
+        额外检查：仍有用户继承该角色时拒绝删除（可解除继承后再删）
         """
         if rolename not in self._roles:
             raise KeyError(f"角色<{rolename}> 不存在")
@@ -146,6 +146,50 @@ class RBACManager:
     @_thread_safe
     def get_role(self, name: str) -> Optional["Role"]:
         return self._roles.get(name)
+
+    @_thread_safe
+    def get_users_for_role(
+        self, role_name: str, include_indirect: bool = True
+    ) -> List["User"]:
+        """
+        返回拥有指定角色的用户列表
+        - include_indirect=True 时，返回直接拥有该角色或通过继承间接拥有该角色的用户
+        """
+        role = self._roles.get(role_name)
+        if role is None:
+            raise KeyError(f"角色<{role_name}> 不存在")
+
+        result: List[User] = []
+
+        def _role_in_chain(start: Role, target: Role) -> bool:
+            visited: Set[Role] = set()
+            stack: List[Role] = [start]
+            while stack:
+                r = stack.pop()
+                if r is target:
+                    return True
+                if r in visited:
+                    continue
+                visited.add(r)
+                for p in r._parents:
+                    if p not in visited:
+                        stack.append(p)
+            return False
+
+        for u in self._users.values():
+            if not include_indirect:
+                if role in u._roles:
+                    result.append(u)
+            else:
+                found = False
+                for r in u._roles:
+                    if _role_in_chain(r, role):
+                        found = True
+                        break
+                if found:
+                    result.append(u)
+
+        return result
 
     # --------------------------------------------------
     # 序列化：把当前整个系统压成纯字典，方便 JSON 保存
@@ -316,6 +360,15 @@ class Role(ManagedEntity):
             logger.debug("角色<%s> 权限树: %s", self.name, tree)
             return tree
 
+    def delete(self) -> None:
+        """从所属管理器中删除自己（委托给 RBACManager.delete_role）"""
+        with self._acquire_lock():
+            self._manager.delete_role(self.name)
+
+    def get_all_users(self, include_indirect: bool = True) -> List["User"]:
+        """通过管理器查询：返回直接/间接拥有此角色的用户列表"""
+        return self._manager.get_users_for_role(self.name, include_indirect)
+
 
 # ------------------------------------------------------
 # 用户：绑定角色 + 黑白名单（线程安全）
@@ -330,11 +383,21 @@ class User(ManagedEntity):
         self._blacklist: Set[str] = set()
         logger.debug("用户<%s> 已创建", name)
 
-    def add_role(self, role: Role) -> None:
+    def add_role(self, role: Union[Role, str]) -> None:
+        """
+        为用户添加角色参数可为 Role 实例或角色名（role_name）
+        """
         with self._acquire_lock():
-            self._check_manager_compatibility(role)
-            self._roles.add(role)
-            logger.debug("用户<%s> 添加角色<%s>", self.name, role.name)
+            if isinstance(role, str):
+                role_obj = self._manager.get_role(role)
+                if role_obj is None:
+                    raise KeyError(f"角色<{role}> 不存在")
+            else:
+                role_obj = role
+                self._check_manager_compatibility(role_obj)
+
+            self._roles.add(role_obj)
+            logger.debug("用户<%s> 添加角色<%s>", self.name, role_obj.name)
 
     def permit(self, p: str) -> None:
         with self._acquire_lock():
@@ -345,6 +408,27 @@ class User(ManagedEntity):
         with self._acquire_lock():
             self._blacklist.add(p)
             logger.debug("用户<%s> 黑名单添加: %r", self.name, p)
+
+    def remove_role(self, role: Union[Role, str]) -> None:
+        """从用户移除某个角色，参数为 Role 或 role_name"""
+        with self._acquire_lock():
+            if isinstance(role, str):
+                role_obj = self._manager.get_role(role)
+                if role_obj is None:
+                    raise KeyError(f"角色<{role}> 不存在")
+            else:
+                role_obj = role
+                self._check_manager_compatibility(role_obj)
+
+            if role_obj not in self._roles:
+                raise KeyError(f"用户<{self.name}> 不包含角色<{role_obj.name}>")
+            self._roles.remove(role_obj)
+            logger.debug("用户<%s> 移除角色<%s>", self.name, role_obj.name)
+
+    def delete(self) -> None:
+        """从所属管理器中删除自己（委托给 RBACManager.delete_user）"""
+        with self._acquire_lock():
+            self._manager.delete_user(self.name)
 
     def can(self, perm_str: str) -> bool:
         with self._acquire_lock():
@@ -370,14 +454,23 @@ class User(ManagedEntity):
             return False
 
     @classmethod
-    def quick_can(cls, user: "User", perm: str, *extra: "Role") -> bool:
+    def quick_can(cls, user: "User", perm: str, *extra: Union["Role", str]) -> bool:
         """
         快捷权限检查：除了用户自身角色外，还可以额外传入一些临时角色进行检查
         """
         with user._acquire_lock():
             # 合并临时角色到单次检查
             checked: set["Role"] = set()
-            for r in (*user._roles, *extra):
+            extras: List[Role] = []
+            for e in extra:
+                if isinstance(e, str):
+                    r_obj = user._manager.get_role(e)
+                    if r_obj:
+                        extras.append(r_obj)
+                else:
+                    extras.append(e)
+
+            for r in (*user._roles, *extras):
                 if r not in checked and r.has_permission(perm):
                     return True
                 checked.add(r)

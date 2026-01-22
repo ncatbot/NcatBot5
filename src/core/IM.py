@@ -767,13 +767,13 @@ class User:
         return user
 
     # RBAC 相关
-    def permit(self, p: str) -> None:
+    def permit(self, perm_str: str) -> None:
         user = self.rbac_user
-        user.permit(p)
+        user.permit(perm_str)
 
-    def deny(self, p: str) -> None:
+    def deny(self, perm_str: str) -> None:
         user = self.rbac_user
-        user.deny(p)
+        user.deny(perm_str)
 
     def can(self, perm_str: str) -> bool:
         user = self.rbac_user

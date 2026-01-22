@@ -36,6 +36,7 @@ class Bot:
 
     def __init__(
         self,
+        root_id: int | str,
         url: str,
         token: Optional[str] = None,
         plugin_dir: Optional[Path | str] = None,
@@ -46,6 +47,7 @@ class Bot:
         reload_mode: Literal["all", "smart", "single"] = "smart",
     ):
         self.debug = debug
+        self.root_id = str(root_id)
 
         # 插件系统
         plugin_dirs = [Path(__file__).resolve().parent / "sys_plugin"]
@@ -141,7 +143,7 @@ class Bot:
             rbac_tree = Path(self.plugin_sys.data_dir / "Ncatbot" / "rbac.json")
             await aiofiles.os.makedirs(rbac_tree.parent, exist_ok=True)
             if rbac_tree.is_file():
-                self._im_client.load_rbac_tree(rbac_tree.absolute())
+                self._im_client.load_rbac_tree(rbac_tree.absolute(), self.root_id)
 
             # 启动插件
             await self.plugin_sys.start()

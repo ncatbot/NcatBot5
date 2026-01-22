@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Generic, List, Optional, Self
 
 if TYPE_CHECKING:
     from ..abc.api_base import APIBase as APIBase
@@ -48,10 +48,10 @@ class IMClient(Generic[APIBaseT]):
     通过类方法获取当前实例
     """
 
-    _instance: Optional[Self] = None
-    _lock = threading.Lock()
+    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _instance: ClassVar[Optional[Self]] = None
     _initialized = False
-    _rbac_manager: RBACManager = RBACManager("Root")
+    _rbac_manager: ClassVar[RBACManager] = RBACManager("Root")
 
     def __new__(cls, *args, **kwargs):
         # 双重检查锁定，确保线程安全
@@ -83,24 +83,26 @@ class IMClient(Generic[APIBaseT]):
         return cls._rbac_manager
 
     @classmethod
-    def load_rbac_tree(cls, file: str):
+    def load_rbac_tree(cls, file: str, root_id: str):
         """加载RBAC树"""
         cls._rbac_manager.load_from_file(file)
         rbac = cls._rbac_manager
         """权限结构
-        Default
-        User: Default
-        Group: User
-        Admin: User
-        Owner: Admin
+        Root            Bot所有者的权限
+        Default         所有实体的默认权限
+        User: Default   用户的权限
+        Group: User     群成员的权限
+        Admin: User     群管理员的权限
+        Owner: Admin    群所有者的权限
         """
         root_role = {
+            "Root": (),  # Bot所有者的权限
             "Default": (),  # 所有实体的默认权限
             "User": ("Default",),  # 用户的权限
             "Group": ("User",),  # 群成员的权限
-            "Admin": ("User",),  # 管理员的权限
-            "Owner": ("Admin",),  # 所有者的权限
-            # "Neko": ("Owner")         # 可爱猫娘的权限  可爱的猫娘总是有特权, 不是吗
+            "Admin": ("User",),  # 群管理员的权限
+            "Owner": ("Admin",),  # 群所有者的权限
+            # "Neko": ("Root") # 可爱猫娘的权限  可爱的猫娘总是有特权, 不是吗
         }
         for role_name, parents in root_role.items():
             role = rbac.get_role(role_name)
@@ -110,6 +112,20 @@ class IMClient(Generic[APIBaseT]):
                 raise RuntimeError(f"角色 {role_name} 未成功创建")
             for parent in parents:
                 role.inherit_from(rbac.get_role(parent))
+
+        # Root 权限检查
+        root_user = 0
+        root_users = set()
+        root_role = rbac.get_role("Root")
+        with rbac._lock:
+            for name, user in rbac._users.items():
+                if root_role in user._roles:
+                    root_user += 1
+                    root_users.add(name)
+                if name != root_id:
+                    user.delete()
+        if root_user > 1:
+            log.warning(f"安全警告！意外的Root用户(已删除权限): {root_users - root_id}")
 
     @classmethod
     def save_rbac_tree(cls, file: str):
@@ -400,3 +416,6 @@ class IMClient(Generic[APIBaseT]):
 
     # def can(self, func: str) -> bool:
     #     return self.protocol.can(func)
+
+
+IMClient.get_rbac()
