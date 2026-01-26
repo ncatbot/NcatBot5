@@ -12,7 +12,6 @@ from .core.plugins import Plugin, PluginContext, PluginMixin
 from .implementations.event_bus import NonBlockingEventBus, SimpleEventBus
 from .implementations.plugin_finder import DefaultPluginFinder
 from .implementations.plugin_loader import DefaultPluginLoader
-from .managers.config_manager import ConfigManager
 from .managers.plugin_manager import DefaultPluginManager, PluginManager
 
 __author__ = "Fish-LP <Fish.zh@outlook.com>"
@@ -40,7 +39,6 @@ __all__ = [
     "DefaultPluginLoader",
     "DefaultPluginFinder",
     # 管理器
-    "ConfigManager",
     "PluginManager",
     # 应用
     "PluginApplication",

@@ -195,59 +195,75 @@ class PluginContext:
 
 
 class PluginMeta(ABCMeta):
-    """插件元类 - 简化版本"""
+    """插件元类 - 优化版本"""
 
-    __All_Plugins: dict[UUID, "Plugin"] = {}
+    # 存储所有已注册的插件类: {UUID: PluginClass}
+    # 这是一个属于元类本身的类属性
+    __All_Plugins: Dict[uuid.UUID, Type["Plugin"]] = {}
 
     def __init__(
         cls, name: str, bases: Tuple[type, ...], attrs: Dict[str, Any]
     ) -> None:
         super().__init__(name, bases, attrs)
+
+        # 1. 过滤基类或抽象类
+        # 如果没有 name 属性，或者是 Base 类，通常不需要注册
         if not hasattr(cls, "name"):
             return
 
-        if "Base" in str(cls.__doc__):
+        # 简单的启发式规则：类名包含 "Base" 视为基类
+        if "Base" in name:
             return
 
-        # 验证必需属性
-        if not hasattr(cls, "name") or not cls.name:
+        # 2. 验证必需属性
+        if not cls.name:
             raise PluginValidationError(f"插件 {name} 必须有一个非空的 'name' 属性")
         if not hasattr(cls, "version") or not cls.version:
             raise PluginValidationError(f"插件 {name} 必须有一个非空的 'version' 属性")
 
-        # 类型转换和标准化
+        # 3. 标准化基本属性
         if not isinstance(cls.name, str):
             cls.name = str(cls.name)
         if not isinstance(cls.version, str):
             cls.version = str(cls.version)
 
-        # 设置id ( name + version + authors )
+        # 4. 处理作者信息 (必须在生成 ID 之前)
+        raw_authors = getattr(cls, "authors", None)
+        processed_authors: List[str] = []
+
+        if raw_authors is None:
+            processed_authors = []
+        elif isinstance(raw_authors, str):
+            processed_authors = [raw_authors]
+        elif isinstance(raw_authors, Iterable):
+            # 过滤掉 None，并转为字符串
+            processed_authors = [str(a) for a in raw_authors if a is not None]
+        else:
+            # 其他类型视为无效
+            processed_authors = []
+
+        # 更新类属性，确保后续使用的是标准化后的列表
+        cls.authors = processed_authors
+
+        # 5. 设置 ID (name + version + authors)
+        # 现在可以安全地使用 cls.authors，因为它已经被标准化为列表了
         unique_authors = {a.strip() for a in cls.authors if a.strip()}
-        seed = f"{cls.name}|{cls.version}|{'|'.join(sorted(unique_authors))}"
+        seed = f"{cls.name}|{cls.version}|{'|'.join(sorted(list(unique_authors)))}"
         cls._id = uuid.uuid5(NAMESPACE, seed)
 
-        # 设置混入类工具
+        # 6. 设置混入类工具引用
         cls._plugin = cls
 
-        # 处理作者信息
-        raw = getattr(cls, "authors", None)
-        if raw is None:
-            cls.authors = []
-        elif isinstance(raw, str):
-            cls.authors = [raw]
-        elif isinstance(raw, Iterable):
-            cls.authors = [str(a) for a in raw if a is not None]
-        else:
-            cls.authors = []
-
-        # 处理依赖和协议版本
+        # 7. 处理依赖和协议版本
         if not hasattr(cls, "dependency") or not isinstance(cls.dependency, dict):
             cls.dependency = {}
         if not hasattr(cls, "protocol_version"):
             cls.protocol_version = PROTOCOL_VERSION
 
-        # 自动收集混入类
+        # 8. 自动收集混入类
         cls._mixins: List[Type[PluginMixin]] = []
+
+        # 从继承链中收集
         for base in bases:
             if (
                 inspect.isclass(base)
@@ -256,7 +272,7 @@ class PluginMeta(ABCMeta):
             ):
                 cls._mixins.append(base)
 
-        # 从类属性中收集混入类
+        # 从类属性中收集 (允许在类体内显式声明 Mixin)
         for attr_name, attr_value in attrs.items():
             if (
                 isinstance(attr_value, type)
@@ -266,7 +282,18 @@ class PluginMeta(ABCMeta):
             ):
                 cls._mixins.append(attr_value)
 
-        cls.__All_Plugins[cls._id] = cls
+        # 9. 注册插件
+        # 注意：这里直接修改元类的 __All_Plugins 字典
+        PluginMeta.__All_Plugins[cls._id] = cls
+
+    # 可选：提供一个类方法来获取所有插件，方便外部调用
+    @classmethod
+    def get_all_plugins(cls) -> Dict[uuid.UUID, Type["Plugin"]]:
+        return cls.__All_Plugins
+
+    @classmethod
+    def clear_plugins(cls) -> None:
+        cls.__All_Plugins.clear()
 
 
 class Plugin(ABC, metaclass=PluginMeta):
@@ -284,9 +311,7 @@ class Plugin(ABC, metaclass=PluginMeta):
     protocol_version: int = PROTOCOL_VERSION
     id: UUID
 
-    def __init__(
-        self, context: PluginContext, config: Dict[str, Any], debug: bool = False
-    ):
+    def __init__(self, context: PluginContext, debug: bool = False):
         """初始化插件
 
         Args:
@@ -297,7 +322,6 @@ class Plugin(ABC, metaclass=PluginMeta):
 
         # 设置基本属性
         self.context = context
-        self.config = config
         self._status = PluginStatus(PluginState.LOADED)
         self._module_name: Optional[str] = None
         self._debug = debug
@@ -437,8 +461,9 @@ class Plugin(ABC, metaclass=PluginMeta):
                 #     mixin_class.__init__(self)
 
                 # 设置插件引用
-                if hasattr(mixin_class, "_set_plugin"):
-                    mixin_class._set_plugin(self, self)
+                # if hasattr(mixin_class, "_set_plugin"):
+                #     mixin_class._set_plugin(self, self)
+                pass
 
     async def _load_mixins(self) -> None:
         """加载所有混入类"""
@@ -468,7 +493,7 @@ class Plugin(ABC, metaclass=PluginMeta):
                 if hasattr(mixin_class, "on_mixin_unload"):
                     try:
                         method = getattr(mixin_class, "on_mixin_unload")
-                        result = await method(self)
+                        result = method(self)
                         if asyncio.iscoroutine(result):
                             await result
                         self.logger.debug(f"混入类 {mixin_class.__name__} 卸载完成")

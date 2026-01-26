@@ -1,15 +1,19 @@
 from abc import abstractmethod
 
+from ..abc.protocol_abc import APIBaseT, ProtocolABC
 from ..plugins_system import Plugin
 from .client import IMClient
-from .plugin_mixin.configer import ConfigerMixin
+from .plugin_mixin.config import ReloadableConfigerMixin
 
 
-class PluginBase(Plugin, ConfigerMixin):
+class PluginBase(
+    Plugin,
+    ReloadableConfigerMixin,
+):
     """Base"""
 
-    def __init__(self, context, config, debug=False):
-        super().__init__(context, config, debug)
+    def __init__(self, context, debug=False):
+        super().__init__(context, debug)
         self._client = None
 
     @abstractmethod
@@ -33,9 +37,13 @@ class PluginBase(Plugin, ConfigerMixin):
         return current
 
     @property
-    def api(self):
+    def api(self) -> APIBaseT:
         return self.client.api
 
     @property
-    def protocol(self):
+    def protocol(self) -> ProtocolABC:
         return self.client.protocol
+
+    def on_config_reloaded(self):
+        """配置文件重载时触发"""
+        pass

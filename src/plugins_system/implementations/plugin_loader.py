@@ -20,7 +20,6 @@ from ..abc.plugins import PluginLoader
 from ..core.plugins import Plugin, PluginContext, PluginSource
 from ..exceptions import PluginNotFound, PluginValidationError
 from ..logger import logger
-from ..managers.config_manager import ConfigManager
 from ..utils.constants import PluginSourceType
 from ..utils.types import PluginName
 
@@ -34,7 +33,6 @@ class DefaultPluginLoader(PluginLoader):
     def __init__(
         self,
         event_bus: "EventBus",
-        config_manager: ConfigManager,
         data_base_dir: Path,
         config_base_dir: Path,  # 新增配置基础目录参数
         debug_mode: bool = False,
@@ -49,7 +47,6 @@ class DefaultPluginLoader(PluginLoader):
             debug_mode: 调试模式
         """
         self.event_bus = event_bus
-        self.config_manager = config_manager
         self.data_base_dir = data_base_dir
         self.config_base_dir = config_base_dir  # 保存配置基础目录
         self.debug_mode = debug_mode
@@ -88,7 +85,6 @@ class DefaultPluginLoader(PluginLoader):
             logger.debug(f"模块 {module_name} 已加载，跳过重新加载")
             return []
 
-        config = await self.config_manager.load_config(PluginName(module_name))
         data_dir = self.data_base_dir / module_name
         config_dir = self.config_base_dir / module_name  # 创建配置目录
 
@@ -122,7 +118,7 @@ class DefaultPluginLoader(PluginLoader):
                     data_dir=data_dir,
                     config_dir=config_dir,  # 传入配置目录
                 )
-                plugin = plugin_cls(context, config, self.debug_mode)
+                plugin = plugin_cls(context, self.debug_mode)
                 plugin.module_name = module_name
                 self._loaded_modules[plugin.name] = (module_name, source)
                 plugins.append(plugin)
@@ -142,7 +138,6 @@ class DefaultPluginLoader(PluginLoader):
                 logger.debug(f"模块 {module_name} 已加载，跳过重新加载")
                 return []
 
-            config = await self.config_manager.load_config(PluginName(module_name))
             data_dir = self.data_base_dir / module_name
             config_dir = self.config_base_dir / module_name  # 创建配置目录
 
@@ -170,7 +165,7 @@ class DefaultPluginLoader(PluginLoader):
                         data_dir=data_dir,
                         config_dir=config_dir,  # 传入配置目录
                     )
-                    plugin = plugin_cls(context, config, self.debug_mode)
+                    plugin = plugin_cls(context, self.debug_mode)
                     plugin.module_name = module_name
                     self._loaded_modules[plugin.name] = (module_name, source)
                     plugins.append(plugin)
@@ -197,7 +192,6 @@ class DefaultPluginLoader(PluginLoader):
             logger.debug(f"模块 {module_name} 已加载，跳过重新加载")
             return []
 
-        config = await self.config_manager.load_config(PluginName(module_name))
         data_dir = self.data_base_dir / module_name
         config_dir = self.config_base_dir / module_name  # 创建配置目录
 
@@ -229,7 +223,7 @@ class DefaultPluginLoader(PluginLoader):
                     data_dir=data_dir.absolute(),
                     config_dir=config_dir.absolute(),  # 传入配置目录
                 )
-                plugin = plugin_cls(context, config, self.debug_mode)
+                plugin = plugin_cls(context, self.debug_mode)
                 plugin.module_name = module_name
                 self._loaded_modules[plugin.name] = (module_name, source)
                 plugins.append(plugin)
@@ -307,13 +301,6 @@ class DefaultPluginLoader(PluginLoader):
 
         module_name, source = self._loaded_modules[plugin_name]
         source.cleanup()
-
-        if module_name in self.plugins:
-            await self.config_manager.save_config(
-                module_name, self.plugins[module_name].config
-            )
-
-        # await self.config_manager.save_config(module_name, self.plugins[plugin_name].config)
 
         del self.plugins[plugin_name]
         del self._loaded_modules[plugin_name]

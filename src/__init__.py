@@ -5,9 +5,19 @@ from .abc.nodes import MessageNode
 from .abc.protocol_abc import APIBaseT, ProtocolABC
 from .adapters import protocols  # 加载协议
 from .core.client import IMClient
-from .core.IM import Group, GroupInfo, Me, Message, MessageInfo, User, UserInfo
+from .core.IM import (
+    Group,
+    GroupInfo,
+    Me,
+    Message,
+    MessageChain,
+    MessageInfo,
+    User,
+    UserInfo,
+)
 from .core.plugin import PluginBase
 from .meta import __version__
+from .plugins_system import Event, EventBus
 from .utils.logger import setup_logging
 
 setup_logging()
@@ -32,8 +42,11 @@ __all__ = [
     "Group",
     "Me",
     "Message",
+    "Event",
     # 消息相关
     "MessageNode",
+    "MessageChain",
+    "get_msg_builder",
     # 信息类
     "UserInfo",
     "GroupInfo",
@@ -44,9 +57,9 @@ __all__ = [
     "APIBase",
     "protocols",
     "PluginBase",
+    "EventBus",
     # 奇怪的东西
     "get_protocol",
-    "get_msg_builder",
     "get_api",
     "__version__",
 ]

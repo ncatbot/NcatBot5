@@ -29,7 +29,6 @@ from ..utils.constants import (
 )
 from ..utils.helpers import _version_satisfies
 from ..utils.types import PluginName
-from .config_manager import ConfigManager
 
 logger = logging.getLogger("PluginsSys")
 
@@ -103,11 +102,9 @@ class DefaultPluginManager(PluginManager):
         self._debounce_timer: Optional[threading.Timer] = None
         self._path_to_plugin_cache: Dict[Path, Set[PluginName]] = {}
 
-        self.config_manager = ConfigManager(config_base_dir)
         self.plugin_finder = DefaultPluginFinder(plugin_dirs)
         self.loader = DefaultPluginLoader(
             self.event_bus,
-            self.config_manager,
             data_base_dir,
             config_base_dir,
             dev_mode,
@@ -144,7 +141,7 @@ class DefaultPluginManager(PluginManager):
                 for p in paths:
                     self.manager._on_fs_event(p, event.event_type)
 
-        self._observer = Observer()
+        self._observer: ObserverType = Observer()
         for plugin_dir in self.plugin_dirs:
             if plugin_dir.exists():
                 self._observer.schedule(
@@ -348,7 +345,6 @@ class DefaultPluginManager(PluginManager):
                 self.event_bus.unregister_plugin_handlers(plugin_name)
 
             plugin.context.close()
-            await self.config_manager.save_config(plugin.module_name, plugin.config)
             await self.loader.unload_plugin_module(plugin_name)
 
             with self._lock:
