@@ -1,6 +1,6 @@
 from src.plugins_system.meta import PROTOCOL_VERSION
 
-__version__ = "5.0.0-dev.6"
+__version__ = "5.0.0-dev.7"
 __plugin_sys_version__ = PROTOCOL_VERSION
 __status__ = "Development"
 # "Development" "Production" "Prototype"
