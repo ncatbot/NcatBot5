@@ -146,6 +146,8 @@ class ReloadableConfigerMixin(ConfigerMixin):
     支持文件重载的ConfigerMixin扩展
     """
 
+    first_load: bool
+
     def __init__(self):
         """
         初始化
@@ -156,6 +158,7 @@ class ReloadableConfigerMixin(ConfigerMixin):
         """
         ConfigerMixin.__init__(self)
         self._reloader: Optional[SingleFileReloader] = None
+        self.first_load = False
 
     async def on_mixin_load(self):
         await ConfigerMixin.on_mixin_load(self)
@@ -165,6 +168,7 @@ class ReloadableConfigerMixin(ConfigerMixin):
             config_file_path.parent.mkdir(parents=True, exist_ok=True)
             config_file_path.touch(exist_ok=True)
             config_file_path.write_text(r"{}", encoding="utf-8")
+            self.first_load = True
         self.setup_config_file(config_file_path)
 
     def setup_config_file(

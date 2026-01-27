@@ -23,7 +23,11 @@ class PluginBase(
 
     async def on_unload(self) -> None:
         """插件卸载时的回调 - 子类可以覆盖"""
-        self.logger.info(f"插件 {self.name} 正在关闭...")
+        self.logger.info(f"插件 {self.name}@{self.version} 正在关闭...")
+
+    async def on_reload(self) -> None:
+        """插件卸载时的回调 - 子类可以覆盖"""
+        self.logger.info(f"插件 {self.name}@{self.version} 正在重载...")
 
     @property
     def client(self) -> IMClient:

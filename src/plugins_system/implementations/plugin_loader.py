@@ -124,6 +124,8 @@ class DefaultPluginLoader(PluginLoader):
                 plugins.append(plugin)
 
             return plugins
+        except Exception as e:
+            logger.error(f"加载插件源失败: {e}")
 
         finally:
             if str(plugin_dir.parent) in sys.path:
@@ -249,7 +251,9 @@ class DefaultPluginLoader(PluginLoader):
         """
         plugin_classes = []
 
-        export_names = getattr(module, "__all__", getattr(module, "__plugin__", None))
+        export_names = getattr(module, "__all__", []) + getattr(
+            module, "__plugin__", []
+        )
 
         if export_names:
             export_items = []
@@ -262,17 +266,14 @@ class DefaultPluginLoader(PluginLoader):
                     logger.warning(f"忽略__all__中的非字符串/类元素: {item}")
 
             for name in export_items:
-                try:
-                    obj = getattr(module, name, None)
-                    if (
-                        inspect.isclass(obj)
-                        and issubclass(obj, Plugin)
-                        and obj is not Plugin
-                        and not inspect.isabstract(obj)
-                    ):
-                        plugin_classes.append(obj)
-                except Exception as e:
-                    logger.warning(f"获取导出项 {name} 失败:\n{e}")
+                obj = getattr(module, name, None)
+                if (
+                    inspect.isclass(obj)
+                    and issubclass(obj, Plugin)
+                    and obj is not Plugin
+                    and not inspect.isabstract(obj)
+                ):
+                    plugin_classes.append(obj)
         else:
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 if (

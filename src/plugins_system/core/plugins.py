@@ -195,7 +195,7 @@ class PluginContext:
 
 
 class PluginMeta(ABCMeta):
-    """插件元类 - 优化版本"""
+    """插件元类"""
 
     # 存储所有已注册的插件类: {UUID: PluginClass}
     # 这是一个属于元类本身的类属性
@@ -211,8 +211,7 @@ class PluginMeta(ABCMeta):
         if not hasattr(cls, "name"):
             return
 
-        # 简单的启发式规则：类名包含 "Base" 视为基类
-        if "Base" in name:
+        if inspect.isabstract(cls):
             return
 
         # 2. 验证必需属性
@@ -273,14 +272,14 @@ class PluginMeta(ABCMeta):
                 cls._mixins.append(base)
 
         # 从类属性中收集 (允许在类体内显式声明 Mixin)
-        for attr_name, attr_value in attrs.items():
-            if (
-                isinstance(attr_value, type)
-                and issubclass(attr_value, PluginMixin)
-                and attr_value is not PluginMixin
-                and attr_value not in cls._mixins
-            ):
-                cls._mixins.append(attr_value)
+        # for attr_name, attr_value in attrs.items():
+        #     if (
+        #         isinstance(attr_value, type)
+        #         and issubclass(attr_value, PluginMixin)
+        #         and attr_value is not PluginMixin
+        #         and attr_value not in cls._mixins
+        #     ):
+        #         cls._mixins.append(attr_value)
 
         # 9. 注册插件
         # 注意：这里直接修改元类的 __All_Plugins 字典
@@ -309,7 +308,8 @@ class Plugin(ABC, metaclass=PluginMeta):
 
     # * 只读属性 - 子类禁止覆盖
     protocol_version: int = PROTOCOL_VERSION
-    id: UUID
+    uuid: UUID
+    id: str  # 插件名称@版本
 
     def __init__(self, context: PluginContext, debug: bool = False):
         """初始化插件
@@ -570,7 +570,7 @@ class Plugin(ABC, metaclass=PluginMeta):
 
     # ==================== 属性访问 ====================
     @property
-    def id(cls) -> UUID:
+    def uuid(cls) -> UUID:
         return cls._id
 
     @property
@@ -612,6 +612,10 @@ class Plugin(ABC, metaclass=PluginMeta):
     @property
     def event_bus(self) -> EventBus:
         return self.context.event_bus
+
+    @property
+    def id(self) -> str:
+        return f"{self.name}@{self.version}"
 
     def has_mixin(self, mixin_class: Type[PluginMixin]) -> bool:
         """检查是否具有指定类型的混入类"""
