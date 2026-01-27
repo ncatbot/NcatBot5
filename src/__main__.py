@@ -139,11 +139,27 @@ class Bot:
                 parents=True, exist_ok=True
             )
 
-            # 加载 RBAC 树
-            rbac_tree = Path(self.plugin_sys.data_dir / "Ncatbot" / "rbac.json")
-            await aiofiles.os.makedirs(rbac_tree.parent, exist_ok=True)
-            if rbac_tree.is_file():
-                self._im_client.load_rbac_tree(rbac_tree.absolute(), self.root_id)
+            rbac_path = self.plugin_sys.data_dir / "Ncatbot" / "rbac.json"
+
+            try:
+                # 确保目录存在（异步）
+                await aiofiles.os.makedirs(rbac_path.parent, exist_ok=True)
+                if not await aiofiles.os.path.exists(rbac_path):
+                    self._im_client.save_rbac_tree(rbac_path)
+
+                if await aiofiles.os.path.exists(rbac_path):
+                    # 现有文件：加载配置
+                    self._im_client.load_rbac_tree(rbac_path, self.root_id)
+                    log.debug(f"RBAC 树已加载: {rbac_path}")
+                else:
+                    # 新文件：初始化并持久化默认结构
+                    self._im_client.load_rbac_tree(rbac_path, self.root_id)
+                    self._im_client.save_rbac_tree(rbac_path)
+                    log.info(f"已创建默认 RBAC 树: {rbac_path}")
+
+            except Exception as e:
+                log.error(f"RBAC 树加载失败: {e}")
+                raise RuntimeError(f"无法初始化权限系统: {e}") from e
 
             # 启动插件
             await self.plugin_sys.start()
@@ -197,10 +213,10 @@ class Bot:
         await asyncio.wait(tasks, timeout=5)
         self._stop_event.set()
 
-        log.info("Bot 已完全停止")
         rbac_tree = Path(self.plugin_sys.data_dir / "Ncatbot" / "rbac.json")
         await aiofiles.os.makedirs(rbac_tree.parent, exist_ok=True)
         IMClient.save_rbac_tree(rbac_tree.absolute())
+        log.info("Bot 已完全停止")
         raise KeyboardInterrupt()
 
     # ---------- 工具 ----------

@@ -30,9 +30,9 @@ class DemoSer(PluginBase):
         # self.logger.info(self.__dict__)
         self.logger.info("reload")
 
-    def on_config_reloaded(self):
+    def on_config_reloaded(self, old_data: dict, new_data: dict) -> None:
         # print("配置文件重载:")
-        print(self.config)
+        print(new_data)
 
     # @online_service("demo_service", event_mod=False)
     # async def bili_ck(self, meta: ServiceMeta):

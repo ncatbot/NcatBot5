@@ -48,6 +48,11 @@ class PluginBase(
     def protocol(self) -> ProtocolABC:
         return self.client.protocol
 
-    def on_config_reloaded(self):
-        """配置文件重载时触发"""
+    def on_config_reloaded(self, old_data: dict, new_data: dict) -> None:
+        """配置热重载钩子，子类可重写实现自定义逻辑
+
+        Args:
+            old_data: 重载前的配置
+            new_data: 重载后的新配置
+        """
         pass

@@ -16,6 +16,7 @@ import logging
 import re
 import sys
 import threading
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Set, Union
 
 logger = logging.getLogger("RBAC")
@@ -29,32 +30,22 @@ logger = logging.getLogger("RBAC")
 # ------------------------------------------------------
 class PermissionMatcher:
     @staticmethod
-    def match(pattern: str, target: str) -> bool:
-        """
-        检查目标权限字符串是否匹配给定的模式
-        """
-        logger.debug("权限匹配: 模式=%r, 目标=%r", pattern, target)
-
-        # 若被 [] 包裹，则整体当正则处理
+    @lru_cache(maxsize=512)  # 缓存常用模式
+    def _compile_pattern(pattern: str):
         if pattern.startswith("[") and pattern.endswith("]"):
-            regex_content = pattern[1:-1]
-            try:
-                matched = re.fullmatch(regex_content, target) is not None
-                logger.debug("正则表达式匹配: 模式=%r, 结果=%s", regex_content, matched)
-                return matched
-            except re.error:
-                logger.debug("无效的正则表达式: %r", regex_content)
-                return False
+            return re.compile(pattern[1:-1])
 
-        # 其余情况先转义，再做通配符替换
-        regex_pattern = re.escape(pattern)
-        regex_pattern = regex_pattern.replace(r"\*\*", ".*")  # ** 匹配任意深度（含点）
-        regex_pattern = regex_pattern.replace(r"\*", "[^.]*")  # *  匹配单段（不含点）
-        matched = re.match(f"^{regex_pattern}$", target) is not None
-        logger.debug(
-            "通配符匹配: 原模式=%r, 转换后=%r, 结果=%s", pattern, regex_pattern, matched
-        )
-        return matched
+        regex = re.escape(pattern)
+        regex = regex.replace(r"\*\*", ".*")
+        regex = regex.replace(r"\*", "[^.]*")
+        return re.compile(f"^{regex}$")
+
+    @staticmethod
+    def match(pattern: str, target: str) -> bool:
+        compiled = PermissionMatcher._compile_pattern(pattern)
+        if isinstance(compiled, re.Pattern):
+            return compiled.fullmatch(target) is not None
+        return compiled.match(target) is not None
 
 
 # ------------------------------------------------------
@@ -312,35 +303,25 @@ class Role(ManagedEntity):
             self._parents.add(parent_role)
             logger.debug("角色<%s> 继承自角色<%s>", self.name, parent_role.name)
 
-    def has_permission(
-        self, perm_str: str, checked_roles: Optional[Set["Role"]] = None
-    ) -> bool:
+    def has_permission(self, perm_str: str) -> bool:
         with self._acquire_lock():
-            if checked_roles is None:
-                _checked_roles: Set["Role"] = set()
-            else:
-                _checked_roles = checked_roles
+            # 迭代DFS替代递归
+            stack: List[Role] = [self]
+            visited: Set[Role] = set()
 
-            if self in _checked_roles:
-                return False
-            _checked_roles.add(self)
+            while stack:
+                role = stack.pop()
+                if role in visited:
+                    continue
+                visited.add(role)
 
-            # 先看自身权限
-            for p in self._permissions:
-                if PermissionMatcher.match(p, perm_str):
-                    logger.debug("角色<%s> 自身权限匹配: %r", self.name, perm_str)
-                    return True
-            # 再看父角色
-            for parent in self._parents:
-                if parent.has_permission(perm_str, _checked_roles):
-                    logger.debug(
-                        "角色<%s> 通过父角色<%s> 继承匹配权限: %r",
-                        self.name,
-                        parent.name,
-                        perm_str,
-                    )
-                    return True
-            logger.debug("角色<%s> 缺少权限: %r", self.name, perm_str)
+                # 检查自身权限
+                for p in role._permissions:
+                    if PermissionMatcher.match(p, perm_str):
+                        return True
+
+                # 将父角色压栈
+                stack.extend(role._parents)
             return False
 
     def get_permission_tree(self) -> Dict[str, Any]:

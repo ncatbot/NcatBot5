@@ -6,7 +6,20 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Generic, List, Optional, Self
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Self,
+    Set,
+    Tuple,
+    Union,
+)
 
 if TYPE_CHECKING:
     from ..abc.api_base import APIBase as APIBase
@@ -17,8 +30,9 @@ from src.exceptions.parse import ParseError
 from ..abc.protocol_abc import APIBaseT, MessageBuilderT, ProtocolABC
 from ..utils.typec import GroupID, MsgId, UserID
 from .rabc import RBACManager
+from .rabc import Role as RBACRole
 
-log = logging.getLogger("IMClient")
+logger = logging.getLogger("IMClient")
 
 # def unsupported_warning(func: Callable) -> Callable:
 #     """
@@ -52,6 +66,16 @@ class IMClient(Generic[APIBaseT]):
     _instance: ClassVar[Optional[Self]] = None
     _initialized = False
     _rbac_manager: ClassVar[RBACManager] = RBACManager("Root")
+    # 预定义角色继承链
+    DEFAULT_ROLE_HIERARCHY: Dict[str, Tuple[str, ...]] = {
+        "Root": (),  # Bot 所有者(最高)
+        "Default": (),  # 所有实体基础权限(最低)
+        "User": ("Default",),  # 普通用户
+        "Group": ("User",),  # 群成员
+        "Admin": ("User",),  # 群管理员
+        "Owner": ("Admin",),  # 群所有者
+        # "Neko": ("Root")              # 可爱猫娘的权限  可爱的猫娘总是有特权, 不是吗
+    }
 
     def __new__(cls, *args, **kwargs):
         # 双重检查锁定，确保线程安全
@@ -75,7 +99,7 @@ class IMClient(Generic[APIBaseT]):
             self._me: Optional["Me"] = None
             self._initialized = True
 
-            log.debug(f"IMClient 初始化完成，使用协议: {self.protocol_name}")
+            logger.debug(f"IMClient 初始化完成，使用协议: {self.protocol_name}")
 
     @classmethod
     def get_rbac(cls) -> RBACManager:
@@ -83,49 +107,116 @@ class IMClient(Generic[APIBaseT]):
         return cls._rbac_manager
 
     @classmethod
-    def load_rbac_tree(cls, file: str, root_id: str):
-        """加载RBAC树"""
-        cls._rbac_manager.load_from_file(file)
-        rbac = cls._rbac_manager
-        """权限结构
-        Root            Bot所有者的权限
-        Default         所有实体的默认权限
-        User: Default   用户的权限
-        Group: User     群成员的权限
-        Admin: User     群管理员的权限
-        Owner: Admin    群所有者的权限
+    def load_rbac_tree(
+        cls,
+        file: Union[str, Path],
+        root_id: Union[str, int],
+        *,
+        strict_root: bool = True,  # 是否强制清理非 root 的多余权限
+        role_hierarchy: Dict[str, Tuple[str, ...]] = None,
+    ):
         """
-        root_role = {
-            "Root": (),  # Bot所有者的权限
-            "Default": (),  # 所有实体的默认权限
-            "User": ("Default",),  # 用户的权限
-            "Group": ("User",),  # 群成员的权限
-            "Admin": ("User",),  # 群管理员的权限
-            "Owner": ("Admin",),  # 群所有者的权限
-            # "Neko": ("Root") # 可爱猫娘的权限  可爱的猫娘总是有特权, 不是吗
-        }
-        for role_name, parents in root_role.items():
+        加载 RBAC 树并初始化角色结构
+
+        Args:
+            file: RBAC 数据文件路径
+            root_id: Bot 所有者 ID（字符串或整数）
+            strict_root: 为 True 时，确保只有指定 root_id 拥有 Root 角色
+            role_hierarchy: 自定义角色继承结构，默认使用 DEFAULT_ROLE_HIERARCHY
+        """
+        # 标准化 root_id 为字符串
+        root_id_str = str(root_id)
+
+        # 从文件加载基础数据
+        cls._rbac_manager = RBACManager.load_from_file(str(file))
+        rbac = cls._rbac_manager
+
+        # 使用自定义或默认角色结构
+        hierarchy = role_hierarchy or cls.DEFAULT_ROLE_HIERARCHY
+
+        # 第一阶段：创建所有角色
+        created_roles: Dict[str, RBACRole] = {}
+        for role_name in hierarchy.keys():
             role = rbac.get_role(role_name)
             if not role:
                 role = rbac.create_role(role_name)
-            if role is None:  # 理论上不会, 但猫娘会保护你的
-                raise RuntimeError(f"角色 {role_name} 未成功创建")
-            for parent in parents:
-                role.inherit_from(rbac.get_role(parent))
+                if role is None:
+                    raise RuntimeError(f"角色 {role_name} 创建失败")
+            created_roles[role_name] = role
 
-        # Root 权限检查
-        root_user = 0
-        root_users = set()
+        # 第二阶段：建立继承关系（确保父角色已存在）
+        for role_name, parents in hierarchy.items():
+            role = created_roles[role_name]
+            for parent_name in parents:
+                if parent_name not in created_roles:
+                    raise ValueError(
+                        f"角色 {role_name} 依赖未定义的父角色 {parent_name}"
+                    )
+                parent_role = created_roles[parent_name]
+                role.inherit_from(parent_role)
+
+        # Root 权限审计与修复
+        cls._audit_root_permissions(rbac, root_id_str, strict_mode=strict_root)
+
+    @classmethod
+    def _audit_root_permissions(
+        cls, rbac: RBACManager, root_id: str, strict_mode: bool = True
+    ):
+        """
+        审计 Root 权限，确保系统安全
+
+        - 确保至少有一个 Root 用户（防止系统锁死）
+        - strict_mode 下移除其他实体的 Root 权限
+        """
         root_role = rbac.get_role("Root")
+        if not root_role:
+            raise RuntimeError("Root 角色未定义")
+
+        root_users: Set[str] = set()
+
         with rbac._lock:
+            # 收集当前所有 Root 用户
             for name, user in rbac._users.items():
+                # 标准化 ID 为字符串比较
+                user_id = str(name)
                 if root_role in user._roles:
-                    root_user += 1
-                    root_users.add(name)
-                if name != root_id:
-                    user.delete()
-        if root_user > 1:
-            log.warning(f"安全警告！意外的Root用户(已删除权限): {root_users - root_id}")
+                    root_users.add(user_id)
+
+            # 安全检查：如果没有 Root 用户，将指定 root_id 设为 Root
+            if not root_users:
+                logger.warning(f"未找到 Root 用户，将 {root_id} 设为 Root")
+                root_user = (
+                    rbac.create_user(root_id)
+                    if rbac.get_user(root_id) is None
+                    else rbac.get_user(root_id)
+                )
+                root_user.add_role(root_role)
+                root_users.add(root_id)
+
+            # 严格模式：清理非授权的 Root 权限
+            if strict_mode:
+                unauthorized_roots = root_users - {root_id}
+                if unauthorized_roots:
+                    logger.warning(
+                        f"发现未授权的 Root 用户: {unauthorized_roots}，正在移除权限"
+                    )
+                    for uid in unauthorized_roots:
+                        user = rbac.get_user(uid)
+                        if user:
+                            user.remove_role(root_role)
+                            logger.info(f"已撤销用户 {uid} 的 Root 权限")
+
+                # 确保指定 root_id 拥有 Root 权限
+                if root_id not in root_users:
+                    root_user = rbac.get_user(root_id) or rbac.create_user(root_id)
+                    root_user.add_role(root_role)
+                    logger.info(f"已授予 {root_id} Root 权限")
+
+        # 审计日志
+        if len(root_users) > 1 and not strict_mode:
+            logger.warning(f"多 Root 用户模式已启用，当前 Root 用户: {root_users}")
+        else:
+            logger.debug(f"Root 权限审计完成，当前 Root 用户: {root_id}")
 
     @classmethod
     def save_rbac_tree(cls, file: str):
@@ -208,7 +299,7 @@ class IMClient(Generic[APIBaseT]):
             return self.protocol._parse_message(response)
         except Exception as e:
             err = ParseError(self.protocol.protocol_name, "解析消息", response)
-            log.error(str(err))
+            logger.error(str(err))
             raise err from e
 
     async def get_user(self, user_id: UserID) -> "User":
@@ -219,7 +310,7 @@ class IMClient(Generic[APIBaseT]):
             return self.protocol._parse_user(response)
         except Exception as e:
             err = ParseError(self.protocol.protocol_name, "解析用户数据", response)
-            log.error(str(err))
+            logger.error(str(err))
             raise err from e
 
     async def get_user_info(self, user_id: UserID) -> Optional[Dict[str, Any]]:
@@ -246,7 +337,7 @@ class IMClient(Generic[APIBaseT]):
                 users.append(self.protocol._parse_user(user_data))
             except Exception as e:
                 err = ParseError(self.protocol.protocol_name, "解析用户数据", response)
-                log.error(str(err))
+                logger.error(str(err))
                 raise err from e
 
         return users
@@ -258,7 +349,7 @@ class IMClient(Generic[APIBaseT]):
             return self.protocol._parse_group(response)
         except Exception as e:
             err = ParseError(self.protocol.protocol_name, "解析群数据", response)
-            log.error(str(err))
+            logger.error(str(err))
             raise err from e
 
     async def get_group_info(self, group_id: GroupID) -> Dict[str, Any]:
@@ -284,7 +375,7 @@ class IMClient(Generic[APIBaseT]):
                 groups.append(self.protocol._parse_group(group_data))
             except Exception as e:
                 err = ParseError(self.protocol.protocol_name, "解析群数据", response)
-                log.error(str(err))
+                logger.error(str(err))
                 raise err from e
 
         return groups
@@ -299,7 +390,7 @@ class IMClient(Generic[APIBaseT]):
                 users.append(self.protocol._parse_user(user_data))
             except Exception as e:
                 err = ParseError(self.protocol.protocol_name, "解析用户数据", response)
-                log.error(str(err))
+                logger.error(str(err))
                 raise err from e
 
         return users
@@ -345,7 +436,7 @@ class IMClient(Generic[APIBaseT]):
             return self.protocol._parse_group(response)
         except Exception as e:
             err = ParseError(self.protocol.protocol_name, "解析群数据", response)
-            log.error(str(err))
+            logger.error(str(err))
             raise err from e
 
     async def set_group_admin(
