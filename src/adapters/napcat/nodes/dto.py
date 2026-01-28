@@ -1,17 +1,16 @@
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from src.utils.dto_tool import dataclass_dto
 
-from .dto_base import BaseDto
+
+@dataclass_dto(frozen=False)
+class BaseDto:
+    def to_api_dict(self) -> Dict[str, Any]:
+        """转换为 API 提交格式"""
+        return self.to_dict(exclude_none=True)
+
 
 # ==================== 基础消息DTO ====================
-
-
-@dataclass_dto
-class TextDTO(BaseDto):
-    """文本消息DTO"""
-
-    text: str
 
 
 @dataclass_dto
@@ -111,7 +110,7 @@ class PokeDTO(BaseDto):
     """戳一戳消息DTO"""
 
     id: str
-    type: Optional[Literal["poke"]] = None
+    type: int = None
 
 
 @dataclass_dto

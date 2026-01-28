@@ -27,19 +27,17 @@ class PluginMixin(ABC):
     def __init__(self: T) -> T:
         pass
 
-    # @property
-    # def plugin(self) -> "Plugin":  # 兼容性设置，推荐直接使用self
-    #     """获取宿主插件实例
+    @property
+    def plugin(self) -> "Plugin":  # 兼容性设置，推荐直接使用self
+        """获取宿主插件实例
 
-    #     Returns:
-    #         宿主插件实例
+        Returns:
+            宿主插件实例
 
-    #     Raises:
-    #         RuntimeError: 当混入类尚未附加到插件时
-    #     """
-    #     if not hasattr(self, "_plugin") or self._plugin is None:
-    #         raise RuntimeError("混入类尚未附加到插件")
-    #     return self._plugin
+        Raises:
+            RuntimeError: 当混入类尚未附加到插件时
+        """
+        return self
 
     # def _set_plugin(self, value):
     #     """设置宿主插件实例

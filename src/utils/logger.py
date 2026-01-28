@@ -44,8 +44,8 @@ LOG_MESSAGE_FORMATS = {
         f"{Color.RESET}%(message)s{Color.RESET}",
         "ERROR": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "
         f"{Color.RED}%(colored_levelname)-8s{Color.RESET} "
-        f"{Color.GRAY}[%(filename)s]{Color.RESET}"
-        f"{Color.MAGENTA}%(name)s:%(lineno)d{Color.RESET} "
+        f"{Color.GRAY}[%(filename)s:%(lineno)d]{Color.RESET}"
+        f"{Color.MAGENTA}%(name)s{Color.RESET} "
         f"{Color.RED}➜{Color.RESET} "
         f"{Color.RESET}%(message)s{Color.RESET}",
         "CRITICAL": f"{Color.CYAN}[%(asctime)s]{Color.RESET} "

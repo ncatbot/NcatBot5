@@ -215,9 +215,7 @@ class DefaultPluginManager(PluginManager):
         self, event_suffix: str, plugin_name: PluginName, data: Any = None
     ) -> None:
         event_name = f"plugin.{plugin_name}.{event_suffix}"
-        self.event_bus.publish(
-            event_name, data, source="PluginManager", target=plugin_name
-        )
+        self.event_bus.publish(event_name, data, source="PluginManager")
 
     # ==================== 生命周期管理 ====================
 

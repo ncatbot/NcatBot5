@@ -499,6 +499,49 @@ class User(ManagedEntity):
             logger.debug("用户<%s> 合并权限树: %s", self.name, tree)
             return tree
 
+    def has_role(self, role: Union[Role, str], include_inherited: bool = False) -> bool:
+        """
+        检查用户是否拥有指定角色
+
+        Args:
+            role: Role 实例或角色名称
+            include_inherited: 若为 True，则检查用户是否直接或间接（通过角色继承）拥有该角色；
+                            若为 False（默认），仅检查直接绑定的角色
+
+        Returns:
+            bool: 是否拥有该角色
+        """
+        with self._acquire_lock():
+            # 统一解析为 Role 对象
+            if isinstance(role, str):
+                target_role = self._manager.get_role(role)
+                if target_role is None:
+                    return False  # 角色不存在，用户肯定没有
+            else:
+                target_role = role
+                self._check_manager_compatibility(target_role)
+
+            # 1. 直接拥有检查
+            if target_role in self._roles:
+                return True
+
+            # 2. 继承链检查（如果需要）
+            if include_inherited:
+                for user_role in self._roles:
+                    # 使用 DFS 检查 user_role 是否继承自 target_role
+                    stack: List[Role] = list(user_role._parents)
+                    visited: Set[Role] = {user_role}
+
+                    while stack:
+                        current = stack.pop()
+                        if current is target_role:
+                            return True
+                        if current not in visited:
+                            visited.add(current)
+                            stack.extend(current._parents)
+
+            return False
+
 
 # ------------------------------------------------------
 # 使用示例和测试

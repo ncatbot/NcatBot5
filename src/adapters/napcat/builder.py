@@ -29,7 +29,6 @@ from .nodes import (
     Rps,
     Shake,
     Share,
-    Text,
     Video,
 )
 
@@ -56,7 +55,7 @@ class MessageBuilder:
         Returns:
             MessageBuilder实例，支持链式调用
         """
-        self._nodes.append(Text(text=content))
+        self._nodes.append(content)
         return self
 
     def face(
@@ -74,9 +73,7 @@ class MessageBuilder:
         self._nodes.append(Face(id=str(face_id), face_text=face_text))
         return self
 
-    def at(
-        self, user_id: Union[str, int], display_name: Optional[str] = None
-    ) -> "MessageBuilder":
+    def at(self, user_id: Union[str, int], all: bool = False) -> "MessageBuilder":
         """添加@用户节点
 
         Args:
@@ -86,18 +83,10 @@ class MessageBuilder:
         Returns:
             MessageBuilder实例，支持链式调用
         """
-        self._nodes.append(At(qq=str(user_id)))
-        if display_name:
-            self._nodes.append(Text(text=f"({display_name})"))
-        return self
-
-    def at_all(self) -> "MessageBuilder":
-        """添加@全体成员节点
-
-        Returns:
-            MessageBuilder实例，支持链式调用
-        """
-        self._nodes.append(AtAll())
+        if all:
+            self._nodes.append(AtAll())
+        else:
+            self._nodes.append(At(qq=str(user_id)))
         return self
 
     # ==================== 媒体消息方法 ====================
@@ -230,9 +219,7 @@ class MessageBuilder:
 
     # ==================== 互动消息方法 ====================
 
-    def poke(
-        self, user_id: Union[str, int], poke_type: str = "poke"
-    ) -> "MessageBuilder":
+    def poke(self, user_id: Union[str, int], poke_type: int = 1) -> "MessageBuilder":
         """添加戳一戳节点
 
         Args:
@@ -386,7 +373,7 @@ class MessageBuilder:
         """
         self._nodes.append(Reply(id=str(message_id)))
         if text:
-            self._nodes.append(Text(text=text))
+            self._nodes.append(text)
         return self
 
     def forward(self, forward_id: str, message_type: str = "group") -> "MessageBuilder":

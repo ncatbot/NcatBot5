@@ -14,8 +14,24 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from re import Pattern
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from .mixin import PluginMixin
 
 from ..abc.events import EventBus
 from ..core.lazy_resolver import LazyDecoratorResolver
@@ -23,6 +39,8 @@ from ..exceptions import PluginValidationError
 from ..utils.constants import NAMESPACE, PROTOCOL_VERSION, PluginSourceType, PluginState
 from ..utils.types import EventHandler, PluginName, PluginVersion
 from .mixin import PluginMixin
+
+PluginMixinT = TypeVar("PluginMixinT", bound="PluginMixin")
 
 
 @dataclass
@@ -295,7 +313,7 @@ class PluginMeta(ABCMeta):
         cls.__All_Plugins.clear()
 
 
-class Plugin(ABC, metaclass=PluginMeta):
+class Plugin(Generic[PluginMixinT], ABC, metaclass=PluginMeta):
     """插件基类"""
 
     # * 必需属性 - 子类必须覆盖

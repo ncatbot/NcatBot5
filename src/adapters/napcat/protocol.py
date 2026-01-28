@@ -2,7 +2,7 @@ import asyncio
 import datetime as dt
 import json
 import logging
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, List, Optional
 
 from ...abc.protocol_abc import ProtocolABC, RawGroup, RawMessage, RawUser
 from ...connector import AsyncWebSocketClient, MessageType
@@ -22,7 +22,8 @@ class NapcatProtocol(ProtocolABC):
     protocol_name = "napcat"
     msg_builder = MessageBuilder
 
-    def __init__(self):
+    def __init__(self, debug: bool = False):
+        super().__init__(debug)
         self._api = NCAPI()
         self._self_id: str = ""
 
@@ -189,8 +190,8 @@ class NapcatProtocol(ProtocolABC):
             timestamp=timestamp,
             group_id=GroupID(raw["group_id"]) if raw.get("group_id") else None,
             raw=raw,
+            reference_text=raw["raw_message"],
             # TODO
-            # reference=,
             # forward_info=,
         )
         if "sender" in raw:
@@ -313,15 +314,16 @@ class NapcatProtocol(ProtocolABC):
         from .nodes.dto import BaseDto
         from .nodes.node_base import NodeT
 
-        Dto = TypeVar("Dto", bound=BaseDto)
-
         node = []
 
         for seg in segments:
             seg_type: str = seg.get("type")
             data: dict = seg.get("data", {})
+            if seg_type == "text":
+                node.append(data["text"])
+                continue
             node_model: NodeT = getattr(nodes, seg_type.capitalize(), None)
-            dto_model: Dto = getattr(dto, f"{seg_type.capitalize()}DTO", None)
+            dto_model: BaseDto = getattr(dto, f"{seg_type.capitalize()}DTO", None)
 
             if dto_model and node_model:
                 dto_class = dto_model.from_dict(data)
@@ -521,15 +523,16 @@ class NapcatProtocol(ProtocolABC):
     # ------------------------- message 分支 ------------------------- #
     async def _print_message(self, event: Event[Message]) -> None:
         msg = event.data
+        msg_pre = msg.reference_text if self.debug else str(msg.content)
         sender = await msg.get_sender()
         group_id = msg.group_id
         nick = sender.nickname
         if group_id:
             groupi = await msg.get_group()
             name = groupi.name
-            logger.info(LogFormats.modern(group_id, nick, sender.uid, msg, name))
+            logger.info(LogFormats.modern(group_id, nick, sender.uid, msg_pre, name))
         else:
-            logger.info(LogFormats.modern(None, nick, sender.uid, msg))
+            logger.info(LogFormats.modern(None, nick, sender.uid, msg_pre))
 
     # ------------------------- notice 分支 ------------------------- #
     async def _print_notice(self, event: Event) -> None:

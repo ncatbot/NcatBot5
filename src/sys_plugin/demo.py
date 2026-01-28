@@ -1,5 +1,6 @@
 from src import PluginBase
 from src.core.IM import Message
+from src.core.plugin_func import listener
 from src.plugins_system import Event
 
 # from src.core.IM import User
@@ -42,11 +43,14 @@ class DemoSer(PluginBase):
     async def on_unload(self):
         self.logger.info("Demo Service stopped")
 
+    @listener
     def p(self, e: Event[Message]):
         if not isinstance(e.data, Message):
             return
         msg = e.data
+        print("消息格式对比")
         print(msg.raw["raw_message"])
+        print(str(msg))
 
 
 # __plugin__ = [

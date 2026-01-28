@@ -1,10 +1,10 @@
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, TypeVar
 
-from ....abc.nodes import MessageNode
+from src.abc.nodes import MessageNode
 
 if TYPE_CHECKING:
-    from .dto.dto_base import BaseDto
+    from .dto import BaseDto
 
 logger = getLogger(__name__)
 

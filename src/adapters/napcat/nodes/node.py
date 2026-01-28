@@ -11,17 +11,6 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class Text(BaseNode):
-    """文本消息节点"""
-
-    text: str
-    _node_type: str = "text"
-
-    def __str__(self) -> str:
-        return self.text
-
-
-@dataclass
 class Face(BaseNode):
     """表情消息节点"""
 
@@ -70,7 +59,7 @@ class Image(DownloadableNode):
         return self.sub_type == 1
 
     def __str__(self) -> str:
-        return self.summary
+        return self.summary or "[图片]"
 
 
 @dataclass
@@ -117,7 +106,7 @@ class At(BaseNode):
         self.qq = str(self.qq)
 
     def __str__(self) -> str:
-        return "@{qq}".format(qq=self.qq)
+        return f"[@{self.qq}]"
 
 
 @dataclass
@@ -127,7 +116,7 @@ class AtAll(At):
     qq: str = field(default="all")
 
     def __str__(self) -> str:
-        return "@ALL"
+        return "[@ALL]"
 
 
 @dataclass
@@ -156,8 +145,11 @@ class Poke(BaseNode):
     """戳一戳消息节点"""
 
     id: str
-    type: Optional[Literal["poke"]] = None
-    _node_type: str = "poke"
+    type: int
+    _node_type: int = "poke"
+
+    def __str__(self):
+        return f"[{self._node_type}:{self.type}]"
 
 
 @dataclass

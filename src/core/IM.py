@@ -344,6 +344,7 @@ class Message:
         "_forward_info",
         "_client",
         "_info",
+        "_reference_text",
         "_raw",
     )
 
@@ -357,6 +358,7 @@ class Message:
         group_id: GroupID | None = None,
         reference: Optional[MessageReference] = None,
         forward_info: Optional[ForwardInfo] = None,
+        reference_text: str = None,
         raw: dict = None,
     ):
         self._id = msg_id
@@ -370,6 +372,7 @@ class Message:
         self._reference = reference
         self._forward_info = forward_info
         self._raw = raw
+        self._reference_text = reference_text or str(content)
         from .client import IMClient
 
         self._client = IMClient.get_current()
@@ -442,6 +445,10 @@ class Message:
     def is_system(self) -> bool:
         return self._message_type == self.SYSTEM
 
+    @property
+    def reference_text(self) -> str:
+        return self._reference_text
+
     # 代理到 content
     def __getitem__(self, index: int | slice) -> Union[MessageNodeT, str, MessageChain]:
         return self._content[index]
@@ -462,7 +469,7 @@ class Message:
         )
 
     def __str__(self) -> str:
-        return str(self._content)
+        return "".join(self._content.get_strings())
 
     # 异步获取完整对象
     async def get_sender(self) -> "User":
@@ -776,12 +783,17 @@ class User:
         user.deny(perm_str)
 
     def can(self, perm_str: str) -> bool:
+        rbac = self.rbac
         user = self.rbac_user
+        ext_role = [rbac.get_role(self.role.title())]
         group = Group(self._group_id) if self._group_id else None
         if group:
-            return RBACUser.quick_can(user, perm_str, group.role)
-        else:
-            return user.can(perm_str)
+            ext_role.append(group.role)
+
+        return RBACUser.quick_can(user, perm_str, *[i for i in group.role if i])
+
+    def has_role(self, role: str, include_inherited: bool = True):
+        return self.rbac_user.has_role(role, include_inherited=include_inherited)
 
     # 快捷私聊
     async def send_text(self, text: str) -> MsgId:

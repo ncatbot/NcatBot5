@@ -21,12 +21,10 @@ from .node import (
     Rps,
     Shake,
     Share,
-    Text,
     Video,
 )
 
 __all__ = [
-    "Text",
     "Face",
     "DownloadableNode",
     "Image",

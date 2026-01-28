@@ -78,14 +78,19 @@ class ProtocolABC(Generic[APIBaseT, MessageBuilderT], ABC, metaclass=ProtocolMet
     这些接口与具体协议无关，是通用抽象
     """
 
-    def __init__(self):
+    def __init__(self, debug: bool = False):
         """初始化协议
         Args:
             url(str): 连接地址
         """
         # 验证协议名称
+        self._debug = debug
         if not hasattr(self, "protocol_name") or not self.protocol_name:
             raise TypeError(f"{self.__class__.__name__} 必须定义 protocol_name")
+
+    @property
+    def debug(self) -> bool:
+        return self._debug
 
     @property
     @abstractmethod

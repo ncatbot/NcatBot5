@@ -65,7 +65,7 @@ class Bot:
         self.event_bus: EventBus = self.plugin_sys.event_bus
 
         protocol_class = ProtocolMeta.get_protocol(protocol)
-        self._protocol: ProtocolABC = protocol_class()
+        self._protocol: ProtocolABC = protocol_class(debug)
 
         # 停止信号
         self._stop_event = asyncio.Event()
@@ -174,10 +174,10 @@ class Bot:
         except KeyboardInterrupt:
             await self.stop()
         except Exception as e:
-            log.error(e)
             if self.debug:
-                await self.stop()
                 raise e
+            log.error(e)
+            await self.stop()
         finally:
             Bot.running = False
 
