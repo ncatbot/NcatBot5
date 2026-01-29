@@ -793,7 +793,11 @@ class User:
         return RBACUser.quick_can(user, perm_str, *[i for i in group.role if i])
 
     def has_role(self, role: str, include_inherited: bool = True):
-        return self.rbac_user.has_role(role, include_inherited=include_inherited)
+        ret = False
+        if include_inherited:
+            if self.rbac.get_role(self.role.title()):
+                ret = role == self.role.title()
+        return ret or self.rbac_user.has_role(role, include_inherited=include_inherited)
 
     # 快捷私聊
     async def send_text(self, text: str) -> MsgId:

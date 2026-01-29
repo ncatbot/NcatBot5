@@ -1,6 +1,6 @@
 from src import PluginBase
 from src.core.IM import Message
-from src.core.plugin_func import listener
+from src.core.plugin_func import command, listener
 from src.plugins_system import Event
 
 # from src.core.IM import User
@@ -32,8 +32,10 @@ class DemoSer(PluginBase):
         self.logger.info("reload")
 
     def on_config_reloaded(self, old_data: dict, new_data: dict) -> None:
-        # print("配置文件重载:")
+        print("配置文件重载:")
+        print(old_data)
         print(new_data)
+        print(self.config)
 
     # @online_service("demo_service", event_mod=False)
     # async def bili_ck(self, meta: ServiceMeta):
@@ -51,6 +53,11 @@ class DemoSer(PluginBase):
         print("消息格式对比")
         print(msg.raw["raw_message"])
         print(str(msg))
+
+    @listener
+    @command("echo", owner_only=True)
+    def echo(self, c):
+        self.logger.info("echo %s", c)
 
 
 # __plugin__ = [

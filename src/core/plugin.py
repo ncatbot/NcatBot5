@@ -3,14 +3,12 @@ from abc import abstractmethod
 from ..abc.protocol_abc import APIBaseT, ProtocolABC
 from ..plugins_system import Plugin
 from .client import IMClient
-from .plugin_func.command import CommandMixin
 from .plugin_func.config import ReloadableConfigerMixin
 
 
 class PluginBase(
     Plugin,
     ReloadableConfigerMixin,
-    CommandMixin,
 ):
     """Base"""
 
@@ -58,6 +56,3 @@ class PluginBase(
             new_data: 重载后的新配置
         """
         pass
-
-
-Plugin[ReloadableConfigerMixin]

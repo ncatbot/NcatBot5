@@ -1,5 +1,8 @@
+import functools
+import inspect
 import re
 from typing import (
+    Any,
     Callable,
     Optional,
     Pattern,
@@ -8,23 +11,28 @@ from typing import (
     overload,
 )
 
+# 假设这些是从你的项目结构中导入的
 from src.plugins_system import LazyDecoratorResolver, Plugin
 from src.plugins_system.abc.events import EventHandler
 from src.plugins_system.core.events import Event
 from src.plugins_system.core.lazy_resolver import create_namespaced_decorator
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Callable[..., Any])
 
 
 class ListenerResolver(LazyDecoratorResolver):
     """监听器解析器"""
 
     tag = "listener"
-    space = "event"
+    space = "listener"
 
     def handle(self, plugin: Plugin, func: EventHandler, event_bus) -> None:
         """将被标记的函数注册到事件总线，支持 `once` 和 `filter` 元数据。"""
+        # 获取 'listener' 命名空间下的数据字典
         kw = self.get_kwd(func)
+
+        # 修正：键名是 'event'，而不是 'listener'
+        # 'listener' 是 space（命名空间），'event' 是存储在其中的参数名
         event = kw.get("event")
         if not event:
             return
@@ -33,50 +41,57 @@ class ListenerResolver(LazyDecoratorResolver):
         raw = kw.get("raw", True)
         filter_fn = kw.get("filter")
 
-        import functools
-        import inspect
-
-        target = func
+        # 获取原始函数以检查是否为异步
         base_func = getattr(func, "__func__", func)
         is_async = inspect.iscoroutinefunction(base_func)
 
+        # 用于存储注册后的 ID，以便在 once=True 时注销
         handler_id = None
 
-        if is_async:
+        def _make_wrapper(target: Callable) -> Callable:
+            """工厂函数：生成同步或异步的包装器"""
+            if is_async:
 
-            async def _wrapper(ev: Event):
-                nonlocal handler_id
-                try:
-                    if filter_fn and not filter_fn(ev):
-                        return
-                    if raw:
-                        await target(ev)
-                    else:
-                        await target(ev.data)
+                async def _wrapper(ev: Event):
+                    nonlocal handler_id
+                    try:
+                        # 过滤检查
+                        if filter_fn and not filter_fn(ev):
+                            return
 
-                finally:
-                    if once and handler_id:
-                        plugin.unregister_handler(handler_id)
+                        # 执行逻辑
+                        if raw:
+                            await target(ev)
+                        else:
+                            await target(ev.data)
+                    finally:
+                        # 如果是一次性监听，执行后注销
+                        if once and handler_id:
+                            plugin.unregister_handler(handler_id)
 
-            wrapped = functools.wraps(base_func)(_wrapper)
-        else:
+            else:
 
-            def _wrapper(ev: Event):
-                nonlocal handler_id
-                try:
-                    if filter_fn and not filter_fn(ev):
-                        return
-                    if raw:
-                        target(ev)
-                    else:
-                        target(ev.data)
-                finally:
-                    if once and handler_id:
-                        plugin.unregister_handler(handler_id)
+                def _wrapper(ev: Event):
+                    nonlocal handler_id
+                    try:
+                        if filter_fn and not filter_fn(ev):
+                            return
+                        if raw:
+                            target(ev)
+                        else:
+                            target(ev.data)
+                    finally:
+                        if once and handler_id:
+                            plugin.unregister_handler(handler_id)
 
-            wrapped = functools.wraps(base_func)(_wrapper)
+            return _wrapper
 
-        # 注册处理器并保存 handler_id（用于 once 注销）
+        # 创建包装器并保留原函数的元信息（如 __name__, __doc__）
+        wrapper = _make_wrapper(func)
+        wrapped = functools.wraps(base_func)(wrapper)
+
+        # 注册处理器，获取 ID
+        # 注意：handler_id 在 wrapper 定义后被赋值，由于闭包引用，wrapper 内部能获取到更新后的值
         handler_id = plugin.register_handler(event, wrapped)
 
 
@@ -101,36 +116,34 @@ def listener(
     包装 Plugin.register_handler 接口，支持字符串或正则匹配事件。
 
     Args:
-        event: 事件名称（字符串）或匹配模式（正则）
-        raw: 是否自动解包事件载荷
-        once: 是否仅触发一次后自动注销
-        filter: 可选的额外过滤函数
+        event: 事件名称（字符串）或匹配模式（正则）。
+        raw: 是否自动解包事件载荷。
+        once: 是否仅触发一次后自动注销。
+        filter: 可选的额外过滤函数。
 
     Returns:
-        装饰后的处理器函数，保留原函数签名
-
-    Examples:
-        >>> class MyPlugin(Plugin):
-        ...     @listener
-        ...     def handle_msg(self, e: Event):
-        ...         '''监听所有事件'''
-        ...         pass
-        ...
-        ...     @listener(re.compile(r"user_joined|user_left"))
-        ...     def handle_members(self, event):
-        ...         '''监听成员变动'''
-        ...         pass
+        装饰器或装饰后的函数
     """
-    # 使用 lazy_resolver 提供的命名空间装饰器工厂，生成兼容的 __mate__ 元数据
-    factory = create_namespaced_decorator("listener", "event")
 
-    # 作为无参装饰器使用：@listener
-    if (
-        callable(event)
-        and not isinstance(event, (str,))
-        and not hasattr(event, "pattern")
-    ):
-        return factory(event=re.compile(r".*"))
+    # 获取命名空间装饰器工厂
+    factory = create_namespaced_decorator("listener", "listener")
 
-    # 带参数用法：@listener("evt") 或 @listener(event=..., once=True)
-    return factory(event=event, once=once, filter=filter, raw=raw)
+    # -------------------------------------------------------
+    # 情况 1: 无参装饰器 @listener
+    # 此时第一个参数 event 实际上是被装饰的函数
+    # -------------------------------------------------------
+    if callable(event) and not isinstance(event, str) and not hasattr(event, "pattern"):
+        func: T = event
+
+        # 使用默认参数构建装饰器
+        return factory(event=re.compile(r".*"), raw=raw, once=once, filter=filter)(func)
+
+    # -------------------------------------------------------
+    # 情况 2: 带参数装饰器 @listener(...) 或 @listener("xxx")
+    # -------------------------------------------------------
+
+    # 处理默认事件：如果没有指定 event，则匹配所有
+    actual_event = event if event is not None else re.compile(r".*")
+
+    # 返回装饰器函数（等待接收被装饰的函数）
+    return factory(event=actual_event, raw=raw, once=once, filter=filter)

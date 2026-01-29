@@ -268,20 +268,17 @@ class PluginMeta(ABCMeta):
         seed = f"{cls.name}|{cls.version}|{'|'.join(sorted(list(unique_authors)))}"
         cls._id = uuid.uuid5(NAMESPACE, seed)
 
-        # 6. 设置混入类工具引用
-        cls._plugin = cls
-
-        # 7. 处理依赖和协议版本
+        # 6. 处理依赖和协议版本
         if not hasattr(cls, "dependency") or not isinstance(cls.dependency, dict):
             cls.dependency = {}
         if not hasattr(cls, "protocol_version"):
             cls.protocol_version = PROTOCOL_VERSION
 
-        # 8. 自动收集混入类
+        # 7. 自动收集混入类
         cls._mixins: List[Type[PluginMixin]] = []
 
         # 从继承链中收集
-        for base in bases:
+        for base in inspect.getmro(cls):
             if (
                 inspect.isclass(base)
                 and issubclass(base, PluginMixin)
@@ -527,8 +524,8 @@ class Plugin(Generic[PluginMixinT], ABC, metaclass=PluginMeta):
         event_bus = self.context.event_bus
 
         for attr_name in dir(self):
-            # if attr_name.startswith('_'):
-            #     continue
+            if attr_name.startswith("__"):
+                continue
 
             attr_value = getattr(self, attr_name)
 

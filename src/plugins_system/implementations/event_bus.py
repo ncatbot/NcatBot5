@@ -208,7 +208,7 @@ class SimpleEventBus(EventBusBase):
         except asyncio.CancelledError:
             pass  # 任务取消是正常的
         except Exception as e:
-            logger.exception(f"事件处理器执行异常: {e}")
+            logger.exception(f"事件处理器({task})执行异常: {e}")
 
     async def _execute_handler(self, handler: EventHandler, event: Event) -> Any:
         """执行事件处理器
@@ -231,7 +231,7 @@ class SimpleEventBus(EventBusBase):
                 else:
                     return await asyncio.to_thread(handler, event)
         except Exception as e:
-            logger.exception(f"事件处理器执行异常: {e}")
+            logger.exception(f"事件处理器({handler})执行异常: {e}")
             raise
 
     def close(self) -> None:

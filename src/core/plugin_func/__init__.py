@@ -1,6 +1,6 @@
 from src.plugins_system import PluginMixin  # noqa: F401
 
-from .command import command
+from .command import CommandArgs, command
 from .listener import listener
 
 __all__ = [
@@ -8,4 +8,5 @@ __all__ = [
     "listener",
     # 命令装饰器
     "command",
+    "CommandArgs",
 ]

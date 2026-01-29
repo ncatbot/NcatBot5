@@ -579,7 +579,7 @@ class EventBusBase(EventBus):
                 loop = asyncio.get_running_loop()
                 return await loop.run_in_executor(None, handler, event)
         except Exception as e:
-            logger.exception(f"事件处理器执行异常:\n{e}")
+            logger.exception(f"事件处理器({handler})执行异常:\n{e}")
             raise
 
     def _handle_publish_result(self, task: asyncio.Task) -> None:

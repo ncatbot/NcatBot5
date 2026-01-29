@@ -125,7 +125,7 @@ class IMClient(Generic[APIBaseT]):
             role_hierarchy: 自定义角色继承结构，默认使用 DEFAULT_ROLE_HIERARCHY
         """
         # 标准化 root_id 为字符串
-        root_id_str = str(root_id)
+        root_id_str = f"U{root_id}"
 
         # 从文件加载基础数据
         cls._rbac_manager = RBACManager.load_from_file(str(file))

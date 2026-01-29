@@ -1,119 +1,122 @@
-import ast
 import functools
 import inspect
-import re
 import time
 from dataclasses import dataclass, field
 from typing import (
     Any,
     Callable,
-    Concatenate,
     Dict,
     List,
     Literal,
-    NewType,
     Optional,
-    ParamSpec,
     Tuple,
-    TypeVar,
     Union,
-    overload,
+    get_type_hints,
 )
 
 from src.core.IM import Message, User
-from src.plugins_system import Event, LazyDecoratorResolver
-from src.plugins_system.core.lazy_resolver import create_namespaced_decorator
-from src.plugins_system.core.mixin import PluginMixin
+from src.plugins_system import Event
 
 # ==============================
 # 类型定义
 # ==============================
 
-P = ParamSpec("P")
-R = TypeVar("R")
-T = TypeVar("T")
-
-Permission = NewType("Permission", str)
+Permission = str
 CooldownUnit = Literal["second", "minute", "hour", "day"]
+CommandHandler = Callable[[Any, Any], Any]  # (self, event/cmd) -> Any
 
 # ==============================
-# AST 辅助函数
+# 命令解析结果
 # ==============================
 
 
-def _ast_parse_signature(func: Callable) -> Dict[str, Any]:
-    """
-    使用 AST 解析函数签名，获取参数信息、默认值和返回类型。
-    这比 inspect 更静态，不依赖于函数是否可调用。
-    """
-    try:
-        source = inspect.getsource(func)
-        tree = ast.parse(source)
+@dataclass
+class CommandArgs:
+    """命令解析结果，可以像列表一样索引参数"""
 
-        # 查找对应的 FunctionDef
-        func_node = None
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
-                func_node = node
-                break
+    event: Event[Message]
+    args: List[str]
 
-        if not func_node:
-            return {}
+    def __init__(self, event: Event[Message], args: List[str]):
+        self.event = event
+        self.args = args
+        self._msg = event.data
 
-        args_info = []
-        # 跳过 'self' (index 0)
-        args = func_node.args.args[1:]
-        defaults = func_node.args.defaults
+    def __getitem__(self, index: int) -> str:
+        """通过索引获取参数"""
+        return self.args[index]
 
-        # 处理默认值对齐
-        defaults_offset = len(args) - len(defaults)
+    def __len__(self) -> int:
+        """参数个数"""
+        return len(self.args)
 
-        for i, arg in enumerate(args):
-            arg_name = arg.arg
-            arg_type = ast.unparse(arg.annotation) if arg.annotation else None
-            has_default = i >= defaults_offset
+    def get(self, index: int, default: Any = None) -> Any:
+        """安全获取参数"""
+        try:
+            return self.args[index]
+        except IndexError:
+            return default
 
-            default_val = None
-            if has_default:
-                default_node = defaults[i - defaults_offset]
-                default_val = (
-                    ast.literal_eval(default_node)
-                    if isinstance(
-                        default_node, (ast.Constant, ast.Num, ast.Str, ast.NameConstant)
-                    )
-                    else ast.unparse(default_node)
-                )
+    def get_int(self, index: int, default: int = 0) -> int:
+        """获取整数参数"""
+        try:
+            return int(self.args[index])
+        except (IndexError, ValueError):
+            return default
 
-            args_info.append(
-                {
-                    "name": arg_name,
-                    "type": arg_type,
-                    "default": default_val,
-                    "required": not has_default,
-                }
-            )
+    def get_float(self, index: int, default: float = 0.0) -> float:
+        """获取浮点数参数"""
+        try:
+            return float(self.args[index])
+        except (IndexError, ValueError):
+            return default
 
-        return_type = ast.unparse(func_node.returns) if func_node.returns else None
+    @property
+    def text(self) -> str:
+        """原始消息文本"""
+        return str(self._msg) if self._msg else ""
 
-        return {"args": args_info, "return_type": return_type}
-    except Exception:
-        # 如果 AST 解析失败（例如动态生成的函数），回退到空字典
-        return {}
+    @property
+    def sender_id(self) -> str:
+        """发送者ID"""
+        return self._msg.sender_id if self._msg else ""
+
+    @property
+    def group_id(self) -> Optional[str]:
+        """群组ID"""
+        return self._msg.group_id if self._msg else None
+
+    @property
+    def raw_args(self) -> str:
+        """原始参数字符串"""
+        return " ".join(self.args)
+
+    def __repr__(self) -> str:
+        return f"CommandArgs(args={self.args}, sender={self.sender_id})"
 
 
 # ==============================
-# 配置与节点
+# 命令配置
 # ==============================
 
 
 @dataclass
 class CommandConfig:
-    """命令配置数据类"""
+    """命令配置"""
 
-    # 触发路径: ["mcp", "server"] -> 触发词 "mcp server"
-    path: List[str] = field(default_factory=list)
+    # 触发词
+    name: str = ""
     aliases: List[str] = field(default_factory=list)
+    description: str = ""
+
+    # 参数传递模式
+    raw: bool = False  # True: 传入原始event; False: 传入CommandArgs
+
+    # 权限控制
     permission: Optional[Permission] = None
+    admin_only: bool = False
+    owner_only: bool = False
+    root_only: bool = True
 
     # 冷却与限流
     cooldown: Optional[Union[int, float]] = None
@@ -121,246 +124,130 @@ class CommandConfig:
     rate_limit: Optional[int] = None
     rate_limit_window: int = 60
 
-    # 文本信息
-    description: Optional[str] = None
-    usage: Optional[str] = None
-    examples: List[str] = field(default_factory=list)
-
-    # AST 解析出的参数信息
-    params: List[Dict[str, Any]] = field(default_factory=list)
-
-    # 开关与限制
-    hidden: bool = False
-    disabled: bool = False
+    # 上下文限制
     guild_only: bool = False
     private_only: bool = False
 
-    # 权限快捷方式
-    admin_only: bool = False
-    superuser_only: bool = False
-    owner_only: bool = False
+    # 状态控制
+    enabled: bool = True
+    hidden: bool = False
 
-    @property
-    def trigger(self) -> str:
-        """将路径列表拼接为触发字符串"""
-        return " ".join(self.path)
+    # 参数信息（自动解析）
+    params: List[Dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
-        return {
-            "trigger": self.trigger,
-            "aliases": self.aliases,
-            "permission": self.permission,
-            "params": self.params,
-            "description": self.description,
-            "usage": self.usage,
-            "examples": self.examples,
-            "hidden": self.hidden,
-            "disabled": self.disabled,
-        }
+    def enable(self) -> None:
+        """启用命令"""
+        self.enabled = True
 
+    def disable(self) -> None:
+        """禁用命令"""
+        self.enabled = False
 
-class CommandNode:
-    """
-    命令节点，代表 Trie 树中的一个节点。
-    """
+    def set_permission(self, permission: Optional[Permission]) -> None:
+        """设置权限"""
+        self.permission = permission
 
-    def __init__(self):
-        self.children: Dict[str, "CommandNode"] = {}
-        self.handler: Optional[Callable] = None
-        self.config: Optional[CommandConfig] = None
+    def add_alias(self, alias: str) -> None:
+        """添加别名"""
+        if alias not in self.aliases:
+            self.aliases.append(alias)
 
-
-class CommandTrie:
-    """
-    命令前缀树
-
-    用于高效匹配命令路径，支持任意层级的子命令。
-    """
-
-    def __init__(self):
-        self.root = CommandNode()
-        # 别名扁平映射：alias_string -> CommandNode
-        # 这样可以避免在 Trie 中插入不规则的别名，保持 Trie 结构的纯洁性
-        self.alias_map: Dict[str, CommandNode] = {}
-
-    def insert(
-        self,
-        path: List[str],
-        handler: Callable,
-        config: CommandConfig,
-        aliases: List[str],
-    ):
-        """插入命令到 Trie"""
-        node = self.root
-        for segment in path:
-            if segment not in node.children:
-                node.children[segment] = CommandNode()
-            node = node.children[segment]
-
-        node.handler = handler
-        node.config = config
-
-        # 注册别名：直接映射到该节点
-        for alias in aliases:
-            self.alias_map[alias] = node
-
-    def match(
-        self, text: str
-    ) -> Tuple[Optional[Callable], Optional[CommandConfig], List[str]]:
-        """
-        匹配文本
-        返回:
-        """
-        segments = text.strip().split()
-
-        # 1. 尝试在 Trie 中精确匹配路径
-        node = self.root
-        matched_depth = 0
-
-        for seg in segments:
-            if seg in node.children:
-                node = node.children[seg]
-                matched_depth += 1
-            else:
-                break
-
-        if node.handler and matched_depth == len(segments):
-            # 完全匹配
-            return node.handler, node.config, []
-
-        # 2. 如果 Trie 没完全匹配，尝试匹配别名
-        # 注意：这里假设别名是全词匹配，或者用户输入的就是别名本身
-        # 简单起见，我们检查输入文本是否完全等于某个别名
-        if text in self.alias_map:
-            alias_node = self.alias_map[text]
-            return alias_node.handler, alias_node.config, []
-
-        # 如果是部分匹配（如输入 "mcp"，匹配到 mcp 节点，但该节点无 handler）
-        # 可以在此处扩展逻辑，比如返回可能的子命令列表
-        return None, None, []
+    def remove_alias(self, alias: str) -> None:
+        """移除别名"""
+        if alias in self.aliases:
+            self.aliases.remove(alias)
 
 
 # ==============================
-# 全局路由器
+# 命令实例
 # ==============================
 
 
-class CommandRouter:
-    """全局命令路由器 - 单例模式"""
+class Command:
+    """命令实例"""
 
-    _instance: Optional["CommandRouter"] = None
-    _is_registered: bool = False
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._trie = CommandTrie()
-        return cls._instance
-
-    def register(self, path: List[str], handler: Callable, config: CommandConfig):
-        """注册命令路径"""
-        if not path:
-            raise ValueError("Command path cannot be empty")
-
-        self._trie.insert(path, handler, config, config.aliases)
-
-    def setup_listener(self, event_bus):
-        """注册全局监听器"""
-        if self._is_registered:
-            return
-        event_bus.register_handler(re.compile(r".*"), self._dispatch, "CommandRouter")
-        self._is_registered = True
-
-    async def _dispatch(self, event: Event[Message]):
-        msg = event.data
-        if not isinstance(msg, Message):
-            return
-
-        text = str(msg).strip()
-        if not text:
-            return
-
-        handler, config, _ = self._trie.match(text)
-
-        if handler and config:
-            # 执行包装后的处理器
-            if inspect.iscoroutinefunction(handler):
-                await handler(event)
-            else:
-                handler(event)
-        # else: 无匹配，忽略
-
-
-# ==============================
-# 包装器逻辑
-# ==============================
-
-
-class CommandFunc:
-    """命令函数包装器"""
-
-    _cooldown_store: Dict[str, float] = {}
-    _rate_limit_store: Dict[str, List[float]] = {}
-
-    def __init__(self, func: Callable, config: CommandConfig):
-        self.original_func = func
+    def __init__(self, instance: Any, handler: CommandHandler, config: CommandConfig):
+        self.instance = instance  # Plugin实例
+        self.handler = handler  # 原始处理器
         self.config = config
-        self.is_async = inspect.iscoroutinefunction(func)
+        self._original_handler = handler
+        self._wrapped_handler = self._wrap_handler()
+
+        # 冷却和限流存储
+        self._cooldown_store: Dict[str, float] = {}
+        self._rate_limit_store: Dict[str, List[float]] = {}
 
     def _get_user_key(self, event: Event[Message]) -> str:
+        """获取用户标识键"""
         msg = event.data
         if not isinstance(msg, Message):
             return "unknown"
-        return f"{self.config.trigger}:{msg.sender_id}"
+        return f"{self.config.name}:{msg.sender_id}"
 
-    def build(self) -> Callable:
-        func = self.original_func
+    def _create_handler_wrapper(self) -> Callable[[Event[Message]], Any]:
+        """创建处理器包装器，根据raw模式决定传入参数"""
+        if self.config.raw:
+            # raw=True: 传入原始event
+            @functools.wraps(self.handler)
+            def wrapper(event: Event[Message]) -> Any:
+                return self.handler(self.instance, event)
 
-        if self.config.guild_only or self.config.private_only:
-            func = self._wrap_context_check(func)
-        if (
-            self.config.admin_only
-            or self.config.superuser_only
-            or self.config.owner_only
-            or self.config.permission
-        ):
-            func = self._wrap_permission_check(func)
-        if self.config.cooldown:
-            func = self._wrap_cooldown(func)
-        if self.config.rate_limit:
-            func = self._wrap_rate_limit(func)
-
-        if self.is_async:
-            return self._async_final_wrapper(func)
         else:
-            return self._sync_to_async_final_wrapper(func)
-
-    def _wrap_context_check(self, func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(ev: Event[Message]):
-            msg = ev.data
-            if not isinstance(msg, Message):
-                return
-            is_group = bool(msg.group_id)
-            is_private = not is_group
-            if self.config.guild_only and is_private:
-                return
-            if self.config.private_only and is_group:
-                return
-
-            return await func(ev) if self.is_async else func(ev)
+            # raw=False: 传入CommandArgs
+            @functools.wraps(self.handler)
+            def wrapper(event: Event[Message]) -> Any:
+                # 从事件元数据获取参数
+                args = event.metadata.get("command_args", [])
+                cmd_args = CommandArgs(event, args)
+                return self.handler(self.instance, cmd_args)
 
         return wrapper
 
-    def _wrap_permission_check(self, func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(ev: Event[Message]):
-            msg = ev.data
+    def _wrap_handler(self) -> Callable[[Event[Message]], Any]:
+        """包装处理器，添加各种检查"""
+        handler = self._create_handler_wrapper()
+
+        # 添加权限检查
+        if (
+            self.config.permission
+            or self.config.admin_only
+            or self.config.root_only
+            or self.config.owner_only
+        ):
+            handler = self._wrap_permission_check(handler)
+
+        # 添加上下文检查
+        if self.config.guild_only or self.config.private_only:
+            handler = self._wrap_context_check(handler)
+
+        # 添加冷却检查
+        if self.config.cooldown:
+            handler = self._wrap_cooldown(handler)
+
+        # 添加限流检查
+        if self.config.rate_limit:
+            handler = self._wrap_rate_limit(handler)
+
+        # 添加启用状态检查
+        handler = self._wrap_enabled_check(handler)
+
+        return handler
+
+    def _wrap_permission_check(self, handler: Callable) -> Callable:
+        """包装权限检查"""
+
+        @functools.wraps(handler)
+        def wrapper(event: Event[Message]) -> Any:
+            msg = event.data
             if not isinstance(msg, Message):
                 return
-            user = User(msg.sender_id, group_id=msg.group_id)
 
-            if self.config.superuser_only and not user.has_role("Root"):
+            user = getattr(msg, "_sender_cache", None) or User(
+                msg.sender_id, group_id=msg.group_id
+            )
+
+            # 检查权限
+            if self.config.root_only and not user.has_role("Root"):
                 return
             if self.config.admin_only and not user.has_role("Admin"):
                 return
@@ -369,336 +256,547 @@ class CommandFunc:
             if self.config.permission and not user.can(self.config.permission):
                 return
 
-            return await func(ev) if self.is_async else func(ev)
+            return handler(event)
 
         return wrapper
 
-    def _wrap_cooldown(self, func: Callable) -> Callable:
+    def _wrap_context_check(self, handler: Callable) -> Callable:
+        """包装上下文检查"""
+
+        @functools.wraps(handler)
+        def wrapper(event: Event[Message]) -> Any:
+            msg = event.data
+            if not isinstance(msg, Message):
+                return
+
+            is_group = bool(msg.group_id)
+            is_private = not is_group
+
+            if self.config.guild_only and is_private:
+                return
+            if self.config.private_only and is_group:
+                return
+
+            return handler(event)
+
+        return wrapper
+
+    def _wrap_cooldown(self, handler: Callable) -> Callable:
+        """包装冷却检查"""
         unit_map = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
         cd_sec = self.config.cooldown * unit_map.get(self.config.cooldown_unit, 1)
 
-        @functools.wraps(func)
-        async def wrapper(ev: Event):
-            key = self._get_user_key(ev)
+        @functools.wraps(handler)
+        def wrapper(event: Event[Message]) -> Any:
+            key = self._get_user_key(event)
             now = time.time()
-            if now - CommandFunc._cooldown_store.get(key, 0) < cd_sec:
+
+            if now - self._cooldown_store.get(key, 0) < cd_sec:
                 return
-            CommandFunc._cooldown_store[key] = now
-            return await func(ev) if self.is_async else func(ev)
+
+            self._cooldown_store[key] = now
+            return handler(event)
 
         return wrapper
 
-    def _wrap_rate_limit(self, func: Callable) -> Callable:
+    def _wrap_rate_limit(self, handler: Callable) -> Callable:
+        """包装限流检查"""
         limit = self.config.rate_limit
         window = self.config.rate_limit_window
 
-        @functools.wraps(func)
-        async def wrapper(ev: Event):
-            key = self._get_user_key(ev)
+        @functools.wraps(handler)
+        def wrapper(event: Event[Message]) -> Any:
+            key = self._get_user_key(event)
             now = time.time()
+
+            # 清理过期记录
             history = [
-                t
-                for t in CommandFunc._rate_limit_store.get(key, [])
-                if now - t <= window
+                t for t in self._rate_limit_store.get(key, []) if now - t <= window
             ]
 
             if len(history) >= limit:
                 return
+
             history.append(now)
-            CommandFunc._rate_limit_store[key] = history
-
-            return await func(ev) if self.is_async else func(ev)
+            self._rate_limit_store[key] = history
+            return handler(event)
 
         return wrapper
 
-    def _async_final_wrapper(self, func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(ev: Event):
-            if self.config.disabled:
+    def _wrap_enabled_check(self, handler: Callable) -> Callable:
+        """包装启用状态检查"""
+
+        @functools.wraps(handler)
+        def wrapper(event: Event[Message]) -> Any:
+            if not self.config.enabled:
                 return
-            return await func(ev)
+            return handler(event)
 
         return wrapper
 
-    def _sync_to_async_final_wrapper(self, func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(ev: Event):
-            if self.config.disabled:
-                return
-            return func(ev)
-
-        return wrapper
+    async def __call__(self, event: Event[Message]) -> Any:
+        """执行命令"""
+        if inspect.iscoroutinefunction(self._wrapped_handler):
+            return await self._wrapped_handler(event)
+        return self._wrapped_handler(event)
 
 
 # ==============================
-# 命令组与装饰器
+# 命令路由器
+# ==============================
+
+
+class CommandRouter:
+    """命令路由器"""
+
+    def __init__(self):
+        self._commands: Dict[str, Command] = {}
+        self._alias_map: Dict[str, str] = {}
+        self._prefixes: List[str] = []
+
+    def set_prefixes(self, prefixes: List[str]) -> None:
+        """设置命令前缀"""
+        self._prefixes = prefixes
+
+    def register(self, instance: Any, command: Command) -> None:
+        """注册命令"""
+        name = command.config.name
+
+        # if name in self._commands:
+        #     raise ValueError(f"命令 '{name}' 已注册")
+
+        self._commands[name] = command
+
+        # 注册别名
+        for alias in command.config.aliases:
+            if alias in self._alias_map:
+                raise ValueError(
+                    f"别名 '{alias}' 已被命令 '{self._alias_map[alias]}' 使用"
+                )
+            self._alias_map[alias] = name
+
+        # 注册带前缀的触发词
+        for prefix in self._prefixes:
+            prefixed_name = f"{prefix}{name}"
+            self._alias_map[prefixed_name] = name
+
+            for alias in command.config.aliases:
+                prefixed_alias = f"{prefix}{alias}"
+                self._alias_map[prefixed_alias] = name
+
+    def unregister(self, name: str) -> None:
+        """注销命令"""
+        if name not in self._commands:
+            return
+
+        self._commands.pop(name)
+
+        # 清理别名
+        aliases_to_remove = []
+        for alias, cmd_name in self._alias_map.items():
+            if cmd_name == name:
+                aliases_to_remove.append(alias)
+
+        for alias in aliases_to_remove:
+            del self._alias_map[alias]
+
+    def get_command(self, name: str) -> Optional[Command]:
+        """获取命令"""
+        # 尝试直接匹配
+        if name in self._commands:
+            return self._commands[name]
+
+        # 尝试别名匹配
+        if name in self._alias_map:
+            real_name = self._alias_map[name]
+            return self._commands.get(real_name)
+
+        return None
+
+    def parse_message(self, text: str) -> Tuple[Optional[Command], List[str]]:
+        """解析消息，返回命令和参数"""
+        text = text.strip()
+        if not text:
+            return None, []
+
+        # 分割命令和参数
+        parts = text.split(maxsplit=1)
+        command_text = parts[0]
+        args_text = parts[1] if len(parts) > 1 else ""
+
+        # 获取命令
+        command = self.get_command(command_text)
+        if not command:
+            return None, []
+
+        # 解析参数
+        args = args_text.split() if args_text else []
+
+        return command, args
+
+    async def handle_message(self, event: Event[Message]) -> Optional[Any]:
+        """处理消息事件"""
+        msg = event.data
+        if not isinstance(msg, Message):
+            return
+
+        text = str(msg).strip()
+        command, args = self.parse_message(text)
+
+        if command:
+            # 将参数存入元数据
+            event.metadata["command_args"] = args
+            event.metadata["command_name"] = command.config.name
+
+            return await command.execute(event)
+
+        return None
+
+
+# ==============================
+# 全局路由器和装饰器
+# ==============================
+
+# 全局路由器实例
+_global_router = CommandRouter()
+
+
+def get_router() -> CommandRouter:
+    """获取全局路由器"""
+    return _global_router
+
+
+def set_global_prefixes(prefixes: List[str]) -> None:
+    """设置全局前缀"""
+    _global_router.set_prefixes(prefixes)
+
+
+# ==============================
+# 命令组（支持简洁的装饰器语法）
 # ==============================
 
 
 class CommandGroup:
     """
-    命令组，支持任意嵌套和路径定义
+    命令组，支持简洁的装饰器语法
 
-    Example:
-        group = CommandGroup("bot", "admin")
+    示例：
+        class Plugin:
+            cmds = CommandGroup('test')
 
-        @group.command("user") # 触发词: "bot admin user"
-        def add_user(): ...
+            # 方式1：直接装饰
+            @cmds
+            def echo(self, cmd: CommandArgs):
+                return cmd[0]
+
+            # 方式2：带参数的装饰器
+            @cmds("help", description="帮助命令", raw=True)
+            def help(self, event: Event):
+                args = event.metadata.get("command_args", [])
+                return f"帮助信息，参数: {args}"
+
+            # 方式3：子组
+            admin = cmds.subgroup("admin")
+
+            @admin("add", admin_only=True)
+            def add_admin(self, cmd: CommandArgs):
+                if len(cmd) > 0:
+                    return f"添加管理员: {cmd[0]}"
+                return "请输入用户名"
     """
 
-    def __init__(self, *path_segments: str):
-        # 存储路径片段
-        self.path: List[str] = list(path_segments)
+    def __init__(self, base_path: str = ""):
+        self.base_path = base_path
+        self._instance: Any = None  # 将绑定到Plugin实例
+        self._commands: Dict[str, Command] = {}
+        self._subgroups: Dict[str, "CommandGroup"] = {}
 
-    def command(self, *sub_segments: str, **kwargs):
+    def __set_name__(self, owner: type, name: str) -> None:
+        """在描述符被分配给类属性时调用"""
+        self._instance = None  # 将在__get__中设置
+
+    def __get__(self, instance: Any, owner: type) -> "CommandGroup":
+        """获取描述符时绑定实例"""
+        if instance is None:
+            return self
+
+        # 创建绑定了实例的新CommandGroup
+        bound_group = type(self)(self.base_path)
+        bound_group._instance = instance
+
+        # 重新绑定子组
+        for name, subgroup in self._subgroups.items():
+            bound_subgroup = type(subgroup)(subgroup.base_path)
+            bound_subgroup._instance = instance
+            bound_group._subgroups[name] = bound_subgroup
+
+        return bound_group
+
+    def __call__(self, *args, **kwargs):
         """
-        定义子命令
-
-        Args:
-            *sub_segments: 子命令路径片段
-            **kwargs: 其他 CommandConfig 参数
+        装饰器用法：
+        1. @group  # 不带括号
+        2. @group("name")  # 带命令名
+        3. @group("name", description="desc")  # 带命令名和配置
         """
+        # 判断是直接装饰函数还是带参数装饰
+        if len(args) == 1 and callable(args[0]):
+            # @group 形式
+            return self._register_command(args[0], **kwargs)
+        else:
+            # @group("name") 形式
+            def decorator(func: Callable) -> Command:
+                # 从位置参数中提取命令名
+                cmd_name = None
+                if args:
+                    cmd_name = args[0]
+                # 合并参数
+                all_kwargs = kwargs.copy()
+                if cmd_name:
+                    all_kwargs["name"] = cmd_name
+                return self._register_command(func, **all_kwargs)
 
-        def _decorator(f: Callable):
-            # 合并路径：Group路径 + 装饰器参数路径
-            full_path = self.path + list(sub_segments)
+            return decorator
 
-            # 如果没有提供 name，尝试从函数名获取（作为路径的最后一段，除非 sub_segments 已提供）
-            if not full_path:
-                func_name = getattr(f, "__name__", None)
-                if not func_name:
-                    raise ValueError("Command must have a valid name or path segments")
-                full_path.append(func_name)
+    def _register_command(self, func: Callable, name: str = "", **kwargs) -> Command:
+        """注册命令到组"""
+        if self._instance is None:
+            raise RuntimeError("CommandGroup必须在类实例中使用")
 
-            kwargs["path"] = full_path
-            return command(**kwargs)(f)
+        # 解析函数签名获取参数信息
+        sig = inspect.signature(func)
+        params = []
 
-        return _decorator
+        # 跳过self参数
+        param_list = list(sig.parameters.values())
+        if param_list and param_list[0].name == "self":
+            param_list = param_list[1:]
 
-    def group(self, *sub_segments: str) -> "CommandGroup":
-        """创建子组"""
-        return CommandGroup(*(self.path + list(sub_segments)))
+        for param in param_list:
+            param_info = {
+                "name": param.name,
+                "type": None,
+                "required": param.default is inspect._empty,
+                "default": (
+                    param.default if param.default is not inspect._empty else None
+                ),
+            }
 
+            # 获取类型注解
+            try:
+                type_hints = get_type_hints(func)
+                if param.name in type_hints:
+                    type_ann = type_hints[param.name]
+                    param_info["type"] = (
+                        type_ann.__name__
+                        if hasattr(type_ann, "__name__")
+                        else str(type_ann)
+                    )
+            except Exception:
+                pass
 
-@overload
-def command(func: Callable[Concatenate[T, P], R]) -> Callable[Concatenate[T, P], R]: ...
+            params.append(param_info)
 
+        # 生成完整命令名
+        if not name:
+            name = func.__name__
 
-@overload
-def command(
-    *path_segments: str,
-    aliases: Optional[List[str]] = None,
-    permission: Optional[Permission] = None,
-    cooldown: Optional[Union[int, float]] = None,
-    cooldown_unit: CooldownUnit = "second",
-    rate_limit: Optional[int] = None,
-    rate_limit_window: int = 60,
-    description: Optional[str] = None,
-    usage: Optional[str] = None,
-    examples: Optional[List[str]] = None,
-    hidden: bool = False,
-    disabled: bool = False,
-    guild_only: bool = False,
-    private_only: bool = False,
-    admin_only: bool = False,
-    superuser_only: bool = False,
-    owner_only: bool = False,
-) -> Callable[[Callable[Concatenate[T, P], R]], Callable[Concatenate[T, P], R]]: ...
+        full_name = f"{self.base_path} {name}".strip() if self.base_path else name
 
+        # 解析文档字符串
+        doc_info = _parse_docstring(func.__doc__)
 
-def command(
-    func_or_path: Union[Callable, str] = None,
-    *path_segments: str,
-    aliases: Optional[List[str]] = None,
-    permission: Optional[Permission] = None,
-    cooldown: Optional[Union[int, float]] = None,
-    cooldown_unit: CooldownUnit = "second",
-    rate_limit: Optional[int] = None,
-    rate_limit_window: int = 60,
-    description: Optional[str] = None,
-    usage: Optional[str] = None,
-    examples: Optional[List[str]] = None,
-    hidden: bool = False,
-    disabled: bool = False,
-    guild_only: bool = False,
-    private_only: bool = False,
-    admin_only: bool = False,
-    superuser_only: bool = False,
-    owner_only: bool = False,
-) -> Union[Callable, Callable[[Callable], Callable]]:
-    """
-    命令装饰器
-
-    支持多种定义方式:
-    1. @command -> 使用函数名
-    2. @command("trigger") -> 使用 "trigger"
-    3. @command("a", "b") -> 使用 "a b"
-    """
-
-    # 处理第一个参数可能是函数的情况（无参数调用）
-    if callable(func_or_path):
-        # 此时 func_or_path 是函数，path_segments 为空
-        func = func_or_path
-        return _create_decorator(
-            func,
-            [],
-            {
-                "aliases": aliases,
-                "permission": permission,
-                "cooldown": cooldown,
-                "cooldown_unit": cooldown_unit,
-                "rate_limit": rate_limit,
-                "rate_limit_window": rate_limit_window,
-                "description": description,
-                "usage": usage,
-                "examples": examples,
-                "hidden": hidden,
-                "disabled": disabled,
-                "guild_only": guild_only,
-                "private_only": private_only,
-                "admin_only": admin_only,
-                "superuser_only": superuser_only,
-                "owner_only": owner_only,
-            },
+        # 创建配置
+        config = CommandConfig(
+            name=full_name,
+            aliases=kwargs.get("aliases", []),
+            description=kwargs.get("description") or doc_info.get("description", ""),
+            raw=kwargs.get("raw", False),
+            permission=kwargs.get("permission"),
+            admin_only=kwargs.get("admin_only", False),
+            root_only=kwargs.get("root_only", False),
+            owner_only=kwargs.get("owner_only", False),
+            cooldown=kwargs.get("cooldown"),
+            cooldown_unit=kwargs.get("cooldown_unit", "second"),
+            rate_limit=kwargs.get("rate_limit"),
+            rate_limit_window=kwargs.get("rate_limit_window", 60),
+            guild_only=kwargs.get("guild_only", False),
+            private_only=kwargs.get("private_only", False),
+            enabled=kwargs.get("enabled", True),
+            hidden=kwargs.get("hidden", False),
+            params=params,
         )
 
-    # 否则，func_or_path 是第一个路径片段
-    current_path = [func_or_path] + list(path_segments) if func_or_path else []
+        # 创建命令实例
+        cmd = Command(self._instance, func, config)
 
-    def _decorator(f: Callable) -> Callable:
-        kwargs = {
-            "aliases": aliases,
-            "permission": permission,
-            "cooldown": cooldown,
-            "cooldown_unit": cooldown_unit,
-            "rate_limit": rate_limit,
-            "rate_limit_window": rate_limit_window,
-            "description": description,
-            "usage": usage,
-            "examples": examples,
-            "hidden": hidden,
-            "disabled": disabled,
-            "guild_only": guild_only,
-            "private_only": private_only,
-            "admin_only": admin_only,
-            "superuser_only": superuser_only,
-            "owner_only": owner_only,
-        }
-        return _create_decorator(f, current_path, kwargs)
+        # 注册到全局路由器
+        _global_router.register(self._instance, cmd)
 
-    return _decorator
+        # 存储命令
+        self._commands[name] = cmd
+        return cmd
+
+    def subgroup(self, name: str) -> "CommandGroup":
+        """创建子组"""
+        if name in self._subgroups:
+            return self._subgroups[name]
+
+        base_path = f"{self.base_path} {name}".strip() if self.base_path else name
+        subgroup = CommandGroup(base_path)
+        self._subgroups[name] = subgroup
+        return subgroup
+
+    def get_command(self, name: str) -> Optional[Command]:
+        """获取组内命令"""
+        return self._commands.get(name)
+
+    def enable_all(self) -> None:
+        """启用所有命令"""
+        for cmd in self._commands.values():
+            cmd.config.enable()
+
+    def disable_all(self) -> None:
+        """禁用所有命令"""
+        for cmd in self._commands.values():
+            cmd.config.disable()
 
 
-def _create_decorator(f: Callable, path: List[str], kwargs: Dict) -> Callable:
-    """内部工厂函数，负责构建配置和元数据"""
-
-    # 1. 解析 Docstring
-    doc_info = _parse_docstring(f.__doc__)
-
-    # 2. 如果 path 为空，回退到函数名
-    if not path:
-        func_name = getattr(f, "__name__", None)
-        if not func_name:
-            raise ValueError("Command must have a valid name or explicit path segments")
-        path = [func_name]
-
-    # 3. 使用 AST 解析参数信息
-    ast_info = _ast_parse_signature(f)
-    params = ast_info.get("args", [])
-
-    # 4. 构建 Config
-    config_args = {
-        "path": path,
-        "aliases": kwargs.get("aliases") or [],
-        "permission": kwargs.get("permission"),
-        "cooldown": kwargs.get("cooldown"),
-        "cooldown_unit": kwargs.get("cooldown_unit", "second"),
-        "rate_limit": kwargs.get("rate_limit"),
-        "rate_limit_window": kwargs.get("rate_limit_window", 60),
-        "description": kwargs.get("description") or doc_info.get("description"),
-        "usage": kwargs.get("usage") or doc_info.get("usage"),
-        "examples": kwargs.get("examples") or doc_info.get("examples"),
-        "params": params,  # 注入 AST 解析结果
-        "hidden": kwargs.get("hidden", False),
-        "disabled": kwargs.get("disabled", False),
-        "guild_only": kwargs.get("guild_only", False),
-        "private_only": kwargs.get("private_only", False),
-        "admin_only": kwargs.get("admin_only", False),
-        "superuser_only": kwargs.get("superuser_only", False),
-        "owner_only": kwargs.get("owner_only", False),
-    }
-
-    # 5. 写入元数据
-    # 我们将整个 config 字典存入，Resolver 负责实例化 CommandConfig
-    decorator = create_namespaced_decorator("command", "command", **config_args)
-    return decorator()(f)
+# ==============================
+# 辅助函数
+# ==============================
 
 
 def _parse_docstring(doc: Optional[str]) -> Dict[str, Any]:
+    """解析文档字符串"""
     if not doc:
         return {}
+
     lines = [line.strip() for line in doc.strip().splitlines()]
     if not lines:
         return {}
 
-    result = {"description": lines[0], "usage": None, "examples": []}
-    current_section, buffer = None, []
+    result = {"description": lines[0]}
 
+    # 简单解析示例和用法
+    examples = []
     for line in lines[1:]:
-        if line.lower().startswith("args:"):
-            current_section = "args"
+        if line.startswith("例") or line.startswith("Example"):
             continue
-        elif line.lower().startswith("examples:"):
-            if buffer:
-                result["usage"] = "\n".join(buffer).strip()
-            current_section = "examples"
-            buffer = []
-            continue
+        if line and not line.startswith(":"):
+            examples.append(line)
 
-        if current_section == "args":
-            buffer.append(line)
-        elif current_section == "examples":
-            if line:
-                result["examples"].append(re.sub(r"^\s*[\d\-\*]+\.\s*", "", line))
+    if examples:
+        result["examples"] = examples
 
-    if current_section == "args" and buffer:
-        result["usage"] = "\n".join(buffer).strip()
     return result
 
 
 # ==============================
-# 混入与解析器
+# 消息监听器集成
 # ==============================
 
 
-class CommandMixin(PluginMixin):
-    def __init__(self: T) -> T:
-        self._commands: Dict[str, CommandConfig] = {}  # name -> config
-        return self
+def create_command_listener(
+    router: Optional[CommandRouter] = None,
+) -> Callable[[Event[Message]], Any]:
+    """
+    创建命令监听器
 
-    def register_command(self, name: str, handler: Callable, config: CommandConfig):
-        self._commands[name] = config
-        router = CommandRouter()
-        router.register(config.path, handler, config)
+    用法：
+        @event_handler(re.compile(r".*"))
+        async def on_message(event):
+            return await create_command_listener()(event)
+    """
+    router = router or _global_router
+
+    async def listener(event: Event[Message]) -> Any:
+        return await router.handle_message(event)
+
+    return listener
 
 
-class CommandResolver(LazyDecoratorResolver):
-    tag = "command"
-    space = "command"
-    required_mixin = CommandMixin
+# ==============================
+# 简化的全局命令装饰器（可选）
+# ==============================
 
-    def handle(self, plugin: CommandMixin, func: Callable, event_bus):
-        router = CommandRouter()
-        router.setup_listener(event_bus)
 
-        data = self.get_kwd(func)
-        if not data:
-            return
+def command(name: str, **kwargs):
+    """
+    全局命令装饰器（支持与 @listener 配合使用）
 
-        config = CommandConfig(**data)
-        cmd_func = CommandFunc(func, config)
-        handler = cmd_func.build()
+    用法：
+        @listener
+        @command('echo', owner_only=True)
+        def echo(self, c: CommandArgs):
+            self.logger.info('echo %s', c)
+    """
 
-        # name 依然需要唯一标识，用于插件内部管理
-        name = config.trigger.replace(" ", "_")
-        plugin.register_command(name, handler, config)
+    def decorator(func: Callable) -> Callable:
+        # 1. 准备配置
+        config = CommandConfig(
+            name=name,
+            aliases=kwargs.get("aliases", []),
+            description=kwargs.get("description", ""),
+            raw=kwargs.get("raw", False),  # 默认 False，即传入 CommandArgs
+            permission=kwargs.get("permission"),
+            admin_only=kwargs.get("admin_only", False),
+            root_only=kwargs.get("root_only", False),
+            owner_only=kwargs.get("owner_only", False),
+            cooldown=kwargs.get("cooldown"),
+            cooldown_unit=kwargs.get("cooldown_unit", "second"),
+            rate_limit=kwargs.get("rate_limit"),
+            rate_limit_window=kwargs.get("rate_limit_window", 60),
+            guild_only=kwargs.get("guild_only", False),
+            private_only=kwargs.get("private_only", False),
+            enabled=kwargs.get("enabled", True),
+            hidden=kwargs.get("hidden", False),
+        )
+
+        # 2. 预计算匹配模式（名称和别名）
+        triggers = {config.name}
+        triggers.update(config.aliases)
+
+        @functools.wraps(func)
+        async def wrapper(self, event: Event[Message]) -> Optional[Any]:
+            """
+            包装器逻辑：
+            1. 检查是否为消息事件
+            2. 检查消息文本是否匹配命令触发词
+            3. 如果匹配，初始化 Command 实例并执行
+            """
+            msg = event.data
+            if not isinstance(msg, Message):
+                return None
+
+            text = str(msg).strip()
+            if not text:
+                return None
+
+            # 解析消息文本，提取第一个词作为命令触发词
+            parts = text.split(maxsplit=1)
+            cmd_trigger = parts[0]
+            args_text = parts[1] if len(parts) > 1 else ""
+            args_list = args_text.split() if args_text else []
+
+            # 检查是否匹配当前命令
+            if cmd_trigger not in triggers:
+                return None
+
+            # 将解析出的参数存入 event.metadata，供 Command 类使用
+            # 这与 CommandRouter.parse_message 的逻辑保持一致
+            event.metadata["command_args"] = args_list
+            event.metadata["command_name"] = config.name
+
+            # 延迟初始化 Command 实例（绑定 self）
+            # 使用 wrapper 的属性来缓存实例，避免每次调用都重新创建
+            if not hasattr(wrapper, "_cmd_instance"):
+                wrapper._cmd_instance = Command(self, func, config)
+
+            # 执行命令（包含权限、冷却、参数解析等逻辑）
+            # Command.__call__ 会处理 sync/async
+            return await wrapper._cmd_instance(event)
+
+        return wrapper
+
+    return decorator
